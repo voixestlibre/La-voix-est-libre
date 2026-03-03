@@ -3,20 +3,23 @@ import { Link } from 'react-router-dom';
 import AccueilIcon from '../../assets/accueil.png';
 import { useNavigate } from 'react-router-dom';
 import '../../App.css';
+import type { FormEvent } from 'react';
 
 export default function CreationPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [choraleName, setChoraleName] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const handleSubmit = (e: SubmitEvent & { currentTarget: HTMLFormElement }) => {
+  
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    console.log('Email:', email);
-    console.log('Nom de la chorale:', choraleName);
-
-    navigate('/chef', { state: { email, choraleName } });
+  
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+  
+    const email = formData.get('email');
+    const choraleName = formData.get('choraleName');
+  
+    console.log(email, choraleName);
   };
 
   return (
