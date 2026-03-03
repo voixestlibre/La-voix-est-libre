@@ -28,9 +28,9 @@ export default function HomePage() {
         <button
           className="page-button"
           style={{ width: '270px' }}
-          onClick={() => navigate('/singer')}
+          onClick={() => navigate('/login')}
         >
-          Rejoindre une chorale
+          Se connecter
         </button>
       </div>
     </div>
