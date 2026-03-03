@@ -1,0 +1,70 @@
+/* Styles globaux pour le body */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #ffffff;
+  color: #0a1f44;
+}
+
+/* Conteneur général des pages */
+.page-container {
+  width: 100%;
+  max-width: 1000px;
+  padding: 1rem;
+  margin: 0 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  background-color: white;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Titre h2 */
+h2 {
+  color: #044C8D;
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0 10% 2rem 10%;      /* marge horizontale 10%, 2rem en dessous */
+  text-align: center;
+  font-family: 'Arial', sans-serif;
+}
+
+/* Logo */
+.page-logo {
+  width: 90%;
+  display: block;
+  max-width: 500px;
+  height: auto;
+  margin: 2rem auto;
+}
+
+/* Bouton */
+.page-button {
+  padding: 6px 20px;
+  font-size: 1.2rem;
+  color: #ffffff;
+  background-color: #044C8D;
+  border: 2px solid #044C8D;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.page-button:hover {
+  color: #044C8D;
+  background-color: #ffffff;
+  border: 2px solid #044C8D;
+}
+
+/* Formulaires */
+.page-form-input {
+  border: 2px solid #044C8D;
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  font-size: 1rem;
+  width: 90%; 
+  max-width: 400px; 
+  margin: 0.5rem 0;
+  display: block;
+  box-sizing: border-box;
+}
