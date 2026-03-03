@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AccueilIcon from '../../assets/accueil.png';
-import { useNavigate } from 'react-router-dom';
 import '../../App.css';
 import type { FormEvent } from 'react';
 
 export default function CreationPage() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [choraleName, setChoraleName] = useState('');
   
