@@ -3,26 +3,35 @@ import { Link } from 'react-router-dom';
 import AccueilIcon from '../../assets/accueil.png';
 import '../../App.css';
 import type { FormEvent } from 'react';
+import { createChoir } from '../../infrastructure/storage/choirsService';
 
 export default function CreationPage() {
   const [email, setEmail] = useState('');
   const [choraleName, setChoraleName] = useState('');
-  
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-  
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-  
-    const email = formData.get('email');
-    const choraleName = formData.get('choraleName');
-  
-    console.log(email, choraleName);
+    setLoading(true);
+    setMessage('');
+
+    try {
+      await createChoir(choraleName, email);
+      setMessage('Chorale créée avec succès !');
+
+      // Réinitialisation des champs (optionnel ici, puisque le formulaire disparaît)
+      setChoraleName('');
+      setEmail('');
+    } catch (err: any) {
+      setMessage(`Erreur : ${err.message}`);
+    }
+
+    setLoading(false);
   };
 
   return (
     <div className="page-container">
-      {/* Image Accueil en haut à gauche */}
       <Link to="/">
         <img
           src={AccueilIcon}
@@ -33,29 +42,35 @@ export default function CreationPage() {
 
       <h2>Créer une nouvelle chorale</h2>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="page-form-input"
-        />
+      {/* Affiche le formulaire seulement si aucun message de succès */}
+      {!message && (
+        <form onSubmit={handleSubmit}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="page-form-input"
+          />
 
-        <input
-          type="text"
-          placeholder="Nom de la chorale"
-          value={choraleName}
-          onChange={(e) => setChoraleName(e.target.value)}
-          required
-          className="page-form-input"
-        />
+          <input
+            type="text"
+            placeholder="Nom de la chorale"
+            value={choraleName}
+            onChange={(e) => setChoraleName(e.target.value)}
+            required
+            className="page-form-input"
+          />
 
-        <button className="page-button" type="submit">
-          Créer
-        </button>
-      </form>
+          <button className="page-button" type="submit" disabled={loading}>
+            {loading ? 'Création...' : 'Créer'}
+          </button>
+        </form>
+      )}
+
+      {/* Message de confirmation ou d'erreur */}
+      {message && <p>{message}</p>}
     </div>
   );
 }
