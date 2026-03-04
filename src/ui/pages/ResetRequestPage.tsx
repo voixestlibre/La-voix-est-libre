@@ -14,8 +14,10 @@ export default function RequestResetPage() {
     setLoading(true);
     setMessage('');
 
+    const redirectUrl = 'https://lavoixestlibre.netlify.app/reset-password' ;
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`, 
+      redirectTo: redirectUrl, 
     });
 
     if (error) {
