@@ -3,7 +3,7 @@ import { supabase } from '../../infrastructure/storage/supabaseClient';
 import '../../App.css';
 
 export default function ResetPasswordPage() {
-  const [email, setEmail] = useState('');
+  const [email] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
