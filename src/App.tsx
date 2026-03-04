@@ -3,6 +3,7 @@ import HomePage from './ui/pages/HomePage';
 import CreationPage from './ui/pages/CreationPage';
 import LoginPage from './ui/pages/LoginPage';
 import ResetRequestPage from './ui/pages/ResetRequestPage';
+import ResetPasswordPage from './ui/pages/ResetPasswordPage';
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/create" element={<CreationPage />} />  
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-request" element={<ResetRequestPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Routes>
     </BrowserRouter>
   );
