@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signIn } from '../../infrastructure/storage/authService';
+import { login } from '../../infrastructure/storage/authService';
 import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
 import '../../App.css';
 
@@ -17,9 +17,11 @@ export default function LoginPage() {
     setMessage('');
 
     try {
-      await signIn(email, password);
-      setMessage('Connexion réussie !');
-      navigate('/'); // redirige vers la page d’accueil
+      const result = await login(email, password);
+      setMessage(result.message); 
+      if (!result.isAdmin) {
+        navigate('/'); 
+      }
     } catch (err: any) {
       setMessage(translateSupabaseError(err.message));
     } finally {

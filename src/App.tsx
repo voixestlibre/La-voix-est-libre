@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import HomePage from './ui/pages/HomePage';
 import CreationPage from './ui/pages/CreationPage';
-import SignUpPage from './ui/pages/SignUpPage';
 import LoginPage from './ui/pages/LoginPage';
 
 export default function App() {
@@ -10,8 +9,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/create" element={<CreationPage />} />  
-        <Route path="/login" element={<SignUpPage />} />
-        <Route path="/signup" element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
       </Routes>
     </BrowserRouter>
   );
