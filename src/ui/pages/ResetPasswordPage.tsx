@@ -11,8 +11,10 @@ export default function ResetPasswordPage() {
   // récupérer l'email depuis l'URL si Supabase le fournit
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const emailFromUrl = params.get('email');
-    if (emailFromUrl) setEmail(emailFromUrl);
+    const token = params.get('access_token'); 
+    if (!token) {
+      setMessage('Token manquant dans l’URL ! Impossible de réinitialiser le mot de passe.');
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -20,9 +22,7 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setMessage('');
 
-    const { error } = await supabase.auth.updateUser({
-      password,
-    });
+    const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       setMessage(`Erreur : ${error.message}`);
