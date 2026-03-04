@@ -14,14 +14,11 @@ export async function login(email: string, password: string) {
     if (fetchError) throw fetchError;
 
     // Créer le compte Supabase
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      // Si ce n'est pas “déjà enregistré”, lever l'erreur
-      if (!error.message.includes('already registered')) {
-        throw error;
-      }
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error && !error.message.includes('already registered')) {
+      throw error;
     }
-
+    
     // Ajouter dans administrators si pas déjà présent
     if (!existingAdmin || existingAdmin.length === 0) {
       const { error: adminError } = await supabase

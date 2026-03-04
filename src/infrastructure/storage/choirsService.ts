@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient';
  * Génère un code unique pour la chorale
  */
 async function generateUniqueCode(): Promise<number> {
-  let code: number;
+  let code: number = 0;
   let exists = true;
 
   while (exists) {
