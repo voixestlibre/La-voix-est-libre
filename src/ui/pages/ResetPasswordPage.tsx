@@ -3,18 +3,32 @@ import { supabase } from '../../infrastructure/storage/supabaseClient';
 import '../../App.css';
 
 export default function ResetPasswordPage() {
-  const [email] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  // récupérer l'email depuis l'URL si Supabase le fournit
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('access_token'); 
-    if (!token) {
-      setMessage('Token manquant dans l’URL ! Impossible de réinitialiser le mot de passe.');
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken) {
+      setMessage("Lien invalide ou expiré. Veuillez refaire une demande de réinitialisation.");
+      return;
     }
+
+    supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken || '',
+    }).then(({ error }) => {
+      if (error) {
+        setMessage("Session invalide. Veuillez refaire une demande de réinitialisation.");
+      } else {
+        setReady(true);
+      }
+    });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -37,20 +51,21 @@ export default function ResetPasswordPage() {
   return (
     <div className="page-container">
       <h2>Réinitialisation du mot de passe</h2>
-      <p>Email : {email}</p>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="password"
-          placeholder="Nouveau mot de passe"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="page-form-input"
-        />
-        <button type="submit" className="page-button" disabled={loading}>
-          {loading ? 'Réinitialisation...' : 'Valider'}
-        </button>
-      </form>
+      {ready && (
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            placeholder="Nouveau mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="page-form-input"
+          />
+          <button type="submit" className="page-button" disabled={loading}>
+            {loading ? 'Réinitialisation...' : 'Valider'}
+          </button>
+        </form>
+      )}
       {message && <p>{message}</p>}
     </div>
   );
