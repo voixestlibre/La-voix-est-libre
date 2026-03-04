@@ -12,6 +12,6 @@ export function translateSupabaseError(message: string): string {
       case 'Network error':
         return "Erreur réseau, veuillez réessayer";
       default:
-        return message; 
+        return message;  
     }
   }
