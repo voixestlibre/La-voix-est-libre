@@ -42,7 +42,7 @@ export default function RequestResetPage() {
         />
       </Link>
 
-      <h2>Réinitialiser le mot de passe</h2>
+      <h2>RéinitialiserR le mot de passe</h2>
       {!message && (
         <form onSubmit={handleSubmit}>
           <input
