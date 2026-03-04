@@ -19,7 +19,6 @@ export default function RequestResetPage() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl, 
     });
-    console.log('data:', JSON.stringify(data));
     console.log('error:', JSON.stringify(error));
 
     if (error) {
