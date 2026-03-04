@@ -17,7 +17,7 @@ export async function login(email: string, password: string) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       // Si ce n'est pas “déjà enregistré”, lever l'erreur
-      if (!error.message.includes('already registeredDDD')) {
+      if (!error.message.includes('already registered')) {
         throw error;
       }
     }

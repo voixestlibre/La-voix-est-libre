@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../../infrastructure/storage/authService';
 import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
+import AccueilIcon from '../../assets/accueil.png';
 import '../../App.css';
 
 export default function LoginPage() {
@@ -31,6 +32,14 @@ export default function LoginPage() {
 
   return (
     <div className="page-container">
+      <Link to="/">
+        <img
+          src={AccueilIcon}
+          alt="Accueil"
+          style={{ width: '90px', height: 'auto', cursor: 'pointer', marginBottom: '0.3rem' }}
+        />
+      </Link>
+
       <h2>Connexion</h2>
       <form onSubmit={handleSubmit}>
         <input
@@ -52,7 +61,16 @@ export default function LoginPage() {
         <button type="submit" className="page-button" disabled={loading}>
           {loading ? 'Connexion...' : 'Se connecter'}
         </button>
-      </form>
+
+        <button
+          type="button" 
+          className="page-button"
+          style={{ marginTop: '0.5rem' }}
+          onClick={() => navigate('/reset-request')} 
+        >
+          Réinitialiser le mot de passe
+        </button>
+        </form>
       {message && <p>{message}</p>}
     </div>
   );
