@@ -42,7 +42,7 @@ export default function RequestResetPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/" className="navigation">←</Link>
+        <Link to="/login" className="navigation">←</Link>
         {user && (
           <Link to="/login" className="navigation">⎋</Link>
         )}

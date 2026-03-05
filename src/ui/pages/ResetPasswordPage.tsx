@@ -53,7 +53,9 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="page-container">
-      <Link to="/" className="navigation"> ← </Link>
+      <div className="top-bar">
+        <Link to="/login" className="navigation">←</Link>
+      </div>
       <h2>Réinitialisation du mot de passe</h2>
 
       {ready && !success && (
