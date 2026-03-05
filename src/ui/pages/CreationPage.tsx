@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import AccueilIcon from '../../assets/accueil.png';
 import '../../App.css';
 import type { FormEvent } from 'react';
 import { createChoir } from '../../infrastructure/storage/choirsService';
@@ -32,14 +31,7 @@ export default function CreationPage() {
 
   return (
     <div className="page-container">
-      <Link to="/">
-        <img
-          src={AccueilIcon}
-          alt="Accueil"
-          style={{ width: '90px', height: 'auto', cursor: 'pointer', marginBottom: '0.3rem' }}
-        />
-      </Link>
-
+      <Link to="/" className="navigation"> ← </Link>
       <h2>Créer une nouvelle chorale</h2>
 
       {/* Affiche le formulaire seulement si aucun message de succès */}

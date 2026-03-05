@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../infrastructure/storage/supabaseClient';
 import '../../App.css';
 
@@ -7,6 +8,7 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -42,6 +44,7 @@ export default function ResetPasswordPage() {
       setMessage(`Erreur : ${error.message}`);
     } else {
       setMessage('Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter.');
+      setSuccess(true);
       setPassword('');
     }
 
@@ -50,8 +53,10 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="page-container">
+      <Link to="/" className="navigation"> ← </Link>
       <h2>Réinitialisation du mot de passe</h2>
-      {ready && (
+
+      {ready && !success && (
         <form onSubmit={handleSubmit}>
           <input
             type="password"
@@ -66,7 +71,14 @@ export default function ResetPasswordPage() {
           </button>
         </form>
       )}
-      {message && <p>{message}</p>}
+      {message && (
+        <div>
+          <p>{message}</p>
+          <Link to="/login">
+            <button className="page-button">Se connecter</button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

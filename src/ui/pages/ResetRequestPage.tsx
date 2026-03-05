@@ -1,5 +1,4 @@
-import AccueilIcon from '../../assets/accueil.png';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../infrastructure/storage/supabaseClient';
 import '../../App.css';
@@ -8,6 +7,15 @@ export default function RequestResetPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user || null);
+    };
+    getUser();
+  }, []);  
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -15,11 +23,9 @@ export default function RequestResetPage() {
     setMessage('');
 
     const redirectUrl = 'https://lavoixestlibre.netlify.app/reset-password' ;
-    console.log('redirectUrl:', redirectUrl);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl, 
     });
-    console.log('error:', JSON.stringify(error));
 
     if (error) {
       setMessage('Erreur lors de la demande de réinitialisation.');
@@ -35,14 +41,12 @@ export default function RequestResetPage() {
 
   return (
     <div className="page-container">
-      <Link to="/">
-        <img
-          src={AccueilIcon}
-          alt="Accueil"
-          style={{ width: '90px', height: 'auto', cursor: 'pointer', marginBottom: '0.3rem' }}
-        />
-      </Link>
-
+      <div className="top-bar">
+        <Link to="/" className="navigation">←</Link>
+        {user && (
+          <Link to="/login" className="navigation">⎋</Link>
+        )}
+      </div>
       <h2>Réinitialiser le mot de passe</h2>
       {!message && (
         <form onSubmit={handleSubmit}>
