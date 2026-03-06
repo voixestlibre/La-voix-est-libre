@@ -7,12 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'La voix est libre',
-        short_name: 'VoixLibre',
-        description: 'WebApp pour chorale',
-        theme_color: '#0A1F44',
+        short_name: 'Voix libre',
+        description: 'WebApp pour les chorales',
+        theme_color: '#044C8D',
         icons: [
           {
             src: 'icon-192.png',

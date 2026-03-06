@@ -106,3 +106,46 @@ h2 {
   background: #E6F2FF;
   color: #044C8D;
 }
+
+/* Bullet point musique */
+.list-music {
+  list-style: none; 
+  padding-left: 0;
+}
+.list-music li {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.8rem;
+  font-size: 1.1rem;
+  padding-left: 0.5rem;
+}
+.list-music li .note {
+  color: #FB8917;
+  margin-right: 0.8rem;
+  font-size: 1.2rem;
+}
+
+/* Carte musique */
+.card-music {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.8rem;
+  background-color: #E6F2FF;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); /* petite ombre */
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card-music:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+}
+.card-music .note {
+  color: #FB8917;
+  font-size: 1.4rem;
+  margin-right: 0.8rem;
+}
+.card-music .text {
+  display: flex;
+  flex-direction: column;
+}

@@ -25,13 +25,13 @@ async function generateUniqueCode(): Promise<number> {
 }
 
 /**
- * Crée une chorale avec name et email, génère automatiquement code
+ * Crée une chorale avec name et id utilisateur, génère automatiquement code
  */
-export async function createChoir(name: string, email: string) {
+export async function createChoir(name: string, owner_id: string) {
   const code = await generateUniqueCode();
   const { data, error } = await supabase
     .from('choirs')
-    .insert([{ name, email, code }]);
+    .insert([{ name, owner_id, code }]);
 
   if (error) throw error;
 

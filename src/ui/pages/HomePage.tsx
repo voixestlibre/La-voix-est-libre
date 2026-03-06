@@ -29,13 +29,25 @@ export default function HomePage() {
 
       {/* Boutons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-        <button
-          className="page-button"
-          style={{ width: '270px' }}
-          onClick={() => navigate('/create')}
-        >
-          Créer une chorale
-        </button>
+      {user && (
+          <button
+            className="page-button"
+            style={{ width: '270px' }}
+            onClick={() => navigate('/create-choir')}
+          >
+            Créer une chorale
+          </button>
+        )}
+
+        {user && (
+          <button
+            className="page-button"
+            style={{ width: '270px' }}
+            onClick={() => navigate('/my-choirs')}
+          >
+            Mes chorales
+          </button>
+        )}
 
         <button
           className="page-button2"

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../infrastructure/storage/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
-import { login } from '../../infrastructure/storage/authService';
+import { login, signOut } from '../../infrastructure/storage/authService';
 import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
 import '../../App.css';
 
@@ -10,19 +10,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ email: string; isAdmin: boolean } | null>(null);
 
   const navigate = useNavigate();
 
-  // Vérifie si un utilisateur est déjà connecté au montage
+  // Vérifie si l'utilisateur est déjà connecté
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
-      setUser(data.user || null);
+      if (data.user) {
+        setUser({ email: data.user.email!, isAdmin: false });
+      }
     };
     getUser();
   }, []);
 
+  // A la validation du formulaire de login
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -30,14 +33,16 @@ export default function LoginPage() {
 
     try {
       const result = await login(email, password);
-      setMessage(result.message);
+      setMessage(result.message);      
 
-      // récupérer l'utilisateur Supabase après login
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user || null);
-      if (data.user) {
-        navigate('/'); 
-      }      
+      // Redirections
+      if (result.isNewUser) {
+        navigate('/reset-request'); 
+      } else if (result.isAdmin) {
+      } else {
+        setUser({ email: result.email!, isAdmin: result.isAdmin });
+        navigate('/'); // Login classique → accueil
+      }
     } catch (err: any) {
       setMessage(translateSupabaseError(err.message));
     } finally {
@@ -45,8 +50,9 @@ export default function LoginPage() {
     }
   };
 
+  // Fonction de log Out
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     setUser(null);
     setEmail('');
     setPassword('');
@@ -65,6 +71,7 @@ export default function LoginPage() {
             Se déconnecter
           </button>
         </>
+              
       ) : (
         <>
           <h2>Connexion</h2>
