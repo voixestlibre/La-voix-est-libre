@@ -10,6 +10,7 @@ export default function CreationPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<any>(null);
+  const [canCreate, setCanCreate] = useState(true);
 
   const navigate = useNavigate();
 
@@ -21,6 +22,23 @@ export default function CreationPage() {
         navigate('/');       // ... sinon redirection immédiate
       } else {
         setUser(data.user);
+
+        // Récupérer choirs_nb depuis users_param
+        const { data: param } = await supabase
+        .from('users_param')
+        .select('choirs_nb')
+        .eq('email', data.user.email)
+        .single();
+
+        // Compter les chorales existantes
+        const { count } = await supabase
+          .from('choirs')
+          .select('*', { count: 'exact', head: true })
+          .eq('owner_id', data.user.id);
+
+        if (param && count !== null && count >= param.choirs_nb) {
+          setCanCreate(false);
+        }          
       }
     };
     getUser();
@@ -34,8 +52,7 @@ export default function CreationPage() {
 
     try {
       await createChoir(choraleName, user.id);
-      setMessage('Chorale créée avec succès !');
-      setChoraleName('');
+      navigate('/my-choirs');
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
     }
@@ -46,12 +63,12 @@ export default function CreationPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/" className="navigation">←</Link>
+        <Link to="/my-choirs" className="navigation">←</Link>
         <Link to="/login" className="navigation">⎋</Link>
       </div>
-      <h2>Créer une nouvelle chorale</h2>
+      <h2>Créer une chorale</h2>
 
-      {!message && (
+      {!message && canCreate && (
         <form onSubmit={handleSubmit}>
           <input
             type="text"
@@ -67,6 +84,10 @@ export default function CreationPage() {
         </form>
       )}
 
+      {!message && !canCreate && (
+        <p>Vous avez atteint le nombre maximum de chorales autorisées.</p>
+      )}
+      
       {message && <p>{message}</p>}
     </div>
   );

@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'La voix est libre',
-        short_name: 'Voix libre',
+        short_name: 'La voix est libre',
         description: 'WebApp pour les chorales',
         theme_color: '#044C8D',
         icons: [

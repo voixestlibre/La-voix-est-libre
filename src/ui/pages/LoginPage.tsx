@@ -53,10 +53,7 @@ export default function LoginPage() {
   // Fonction de log Out
   const handleLogout = async () => {
     await signOut();
-    setUser(null);
-    setEmail('');
-    setPassword('');
-    setMessage('Vous êtes déconnecté.');
+    navigate('/');
   };
 
   return (

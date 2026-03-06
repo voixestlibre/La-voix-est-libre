@@ -26,7 +26,7 @@ export async function login(email: string, password: string) {
     if (error) throw error;
     // Insérer l'email dans users_param après déconnexion
     await supabase.auth.signOut();
-    await supabase.from('users_param').insert([{ email, is_admin: true, choirs_nb: 2 }]);
+    await supabase.from('users_param').insert([{ email, is_admin: true, choirs_nb: 1 }]);
   
   } else {
     // Mettre à jour is_admin à true

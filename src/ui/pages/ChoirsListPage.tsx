@@ -7,6 +7,7 @@ export default function MyChoirsPage() {
   const [, setUser] = useState<any>(null);
   const [choirs, setChoirs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [canCreate, setCanCreate] = useState(false);
   const navigate = useNavigate();
 
   // Vérifie si utilisateur connecté et récupère ses chorales
@@ -19,11 +20,22 @@ export default function MyChoirsPage() {
       }
       setUser(userData.user);
 
+      // Récupérer choirs_nb depuis users_param
+      const { data: param } = await supabase
+        .from('users_param')
+        .select('choirs_nb')
+        .eq('email', userData.user.email)
+        .single();
+
       // Récupérer les chorales de cet utilisateur
       const { data: choirData, error } = await supabase
         .from('choirs')
         .select('*')
         .eq('owner_id', userData.user.id);
+
+      if (param) {
+        setCanCreate((choirData?.length ?? 0) < param.choirs_nb);
+      }
 
       if (error) {
         console.error(error);
@@ -38,6 +50,8 @@ export default function MyChoirsPage() {
     fetchData();
   }, [navigate]);
 
+  const formatCode = (code: string) => code.match(/.{1,2}/g)?.join('-') ?? code;
+  
   return (
     <div className="page-container">
       {/* Barre du haut */}
@@ -54,17 +68,28 @@ export default function MyChoirsPage() {
       ) : (
         <ul className="list-music">
           {choirs.map((c) => (
-            <div key={c.id} className="card-music">
+            <div key={c.id} className="card-music orange">
             <i className="fa fa-music note"></i>
-            <div className="text">
-              {/* Titre en gras */}
+            <div className="text" onClick={() => navigate(`/choir/${c.id}`)} style={{ cursor: 'pointer' }}>
               <strong>{c.name}</strong>
-              {/* Saut de ligne pour le code */}
-              <span>Code : {c.code}</span>
+              <span>Code : {formatCode(c.code)}</span>
             </div>
+            <i
+              className="fa fa-trash trash"
+              onClick={() => navigate(`/delete-choir/${c.id}`)}
+            ></i>
             </div>
           ))}
         </ul>
+      )}
+      {canCreate && (
+        <button
+          className="page-button"
+          onClick={() => navigate('/create-choir')}
+          style={{ marginBottom: '1rem' }}
+        >
+          Créer une chorale
+        </button>
       )}
     </div>
   );

@@ -141,11 +141,20 @@ h2 {
   box-shadow: 0 3px 8px rgba(0,0,0,0.5);
 }
 .card-music .note {
-  color: #FB8917;
+  color: #044C8D;
   font-size: 1.4rem;
   margin-right: 0.8rem;
 }
+.card-music.orange .note { color: #FB8917; }
 .card-music .text {
   display: flex;
   flex-direction: column;
 }
+.card-music .trash {
+  color: #044C8D;
+  font-size: 1.2rem;
+  margin-left: auto;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.card-music.orange .trash:hover { color: #FB8917; }
