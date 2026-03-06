@@ -55,7 +55,15 @@ h2 {
   background-color: #ffffff;
   border: 2px solid #044C8D;
 }
-
+.page-button.orange {
+  background-color: #FB8917;
+  border: 2px solid #FB8917;
+}
+.page-button.orange:hover {
+  color: #FB8917;
+  background-color: #ffffff;
+  border: 2px solid #FB8917;
+}
 /* Bouton clair */
 .page-button2 {
   padding: 6px 20px;
@@ -72,6 +80,7 @@ h2 {
   background-color: #044C8D;
   border: 2px solid #044C8D;
 }
+
 
 /* Formulaires */
 .page-form-input {
