@@ -4,7 +4,7 @@ import { supabase } from '../../infrastructure/storage/supabaseClient';
 import '../../App.css';
 
 export default function MyChoirsPage() {
-  const [user, setUser] = useState<any>(null);
+  const [, setUser] = useState<any>(null);
   const [choirs, setChoirs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -37,13 +37,6 @@ export default function MyChoirsPage() {
 
     fetchData();
   }, [navigate]);
-
-  // Déconnexion
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    navigate('/login');
-  };
 
   return (
     <div className="page-container">

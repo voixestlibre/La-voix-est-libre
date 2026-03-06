@@ -22,7 +22,7 @@ export async function login(email: string, password: string) {
 
   if (!userExists) {
     // Créer le compte Supabase
-    const { data, error } = await supabase.auth.signUp({ email, password: internalPassword });
+    const { error } = await supabase.auth.signUp({ email, password: internalPassword });
     if (error) throw error;
     // Insérer l'email dans users_param après déconnexion
     await supabase.auth.signOut();
