@@ -38,10 +38,9 @@ export default function LoginPage() {
       // Redirections
       if (result.isNewUser) {
         navigate('/reset-request'); 
-      } else if (result.isAdmin) {
       } else {
         setUser({ email: result.email!, isAdmin: result.isAdmin });
-        navigate('/'); // Login classique → accueil
+        navigate('/my-choirs'); 
       }
     } catch (err: any) {
       setMessage(translateSupabaseError(err.message));
@@ -105,7 +104,7 @@ export default function LoginPage() {
         </>
       )}
 
-      {message && <p>{message}</p>}
+      {message && <p style={{ color: 'red' }}>{message}</p>}
     </div>
   );
 }

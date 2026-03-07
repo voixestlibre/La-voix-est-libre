@@ -209,7 +209,6 @@ export default function SongPage() {
           {/* Formulaire ajout fichier (propriétaire uniquement) */}
           {isOwner && (
             <>
-              <h3>Ajouter un fichier</h3>
               <form onSubmit={handleUpload}>
                 <div style={{ margin: '0.8rem 0' }}>
                   {/* Input file caché, déclenché par le bouton */}
@@ -261,10 +260,12 @@ export default function SongPage() {
       {/* Overlay PDF plein écran */}
       {pdfUrl && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          width: '100%', height: '100%',
           backgroundColor: '#0A1F44',
           zIndex: 1000,
           display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
         }}>
           {/* Barre du haut : fermer + lecteur audio si actif */}
           <div style={{
@@ -300,6 +301,7 @@ export default function SongPage() {
                       height: '35px', width: '35px', borderRadius: '8px', border: 'none',
                       backgroundColor: 'white', color: 'black',
                       fontSize: '1rem', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
                     <i className="fa fa-music"></i>
