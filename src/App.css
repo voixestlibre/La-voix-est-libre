@@ -30,6 +30,15 @@ h2 {
   font-family: 'Arial', sans-serif;
 }
 
+/* Titre h3 */
+h3 {
+  color: #044C8D;
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin: 2rem 0 1rem 0;
+  font-family: 'Arial', sans-serif;}
+
+
 /* Logo */
 .page-logo {
   width: 90%;
@@ -55,6 +64,15 @@ h2 {
   background-color: #ffffff;
   border: 2px solid #044C8D;
 }
+.page-button.orange {
+  background-color: #FB8917;
+  border: 2px solid #FB8917;
+}
+.page-button.orange:hover {
+  color: #FB8917;
+  background-color: #ffffff;
+  border: 2px solid #FB8917;
+}
 
 /* Bouton clair */
 .page-button2 {
@@ -72,6 +90,7 @@ h2 {
   background-color: #044C8D;
   border: 2px solid #044C8D;
 }
+
 
 /* Formulaires */
 .page-form-input {
@@ -146,6 +165,8 @@ h2 {
   margin-right: 0.8rem;
 }
 .card-music.orange .note { color: #FB8917; }
+.card-music.pink .note { color: #DA486D; }
+.card-music.green .note { color: #07829E; }
 .card-music .text {
   display: flex;
   flex-direction: column;
@@ -158,3 +179,5 @@ h2 {
   transition: color 0.2s;
 }
 .card-music.orange .trash:hover { color: #FB8917; }
+.card-music.pink .trash:hover { color: #DA486D; }
+.card-music.green .trash:hover { color: #07829E; }

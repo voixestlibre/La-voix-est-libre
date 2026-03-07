@@ -31,8 +31,10 @@ export async function createChoir(name: string, owner_id: string) {
   const code = await generateUniqueCode();
   const { data, error } = await supabase
     .from('choirs')
-    .insert([{ name, owner_id, code }]);
-
+    .insert([{ name, owner_id, code }])
+    .select()
+    .single();
+    
   if (error) throw error;
 
   return data;

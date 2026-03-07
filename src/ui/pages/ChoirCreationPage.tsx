@@ -51,7 +51,13 @@ export default function CreationPage() {
     setMessage('');
 
     try {
-      await createChoir(choraleName, user.id);
+      const choir = await createChoir(choraleName, user.id);
+      // Stockage deans local storage
+      const existing = JSON.parse(localStorage.getItem('joined_choirs') || '[]')
+        .filter((c: any) => c !== null);
+      existing.push({ code: choir.code, name: choraleName });
+      localStorage.setItem('joined_choirs', JSON.stringify(existing));  
+      // Renvoi vers liste des chorales    
       navigate('/my-choirs');
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
