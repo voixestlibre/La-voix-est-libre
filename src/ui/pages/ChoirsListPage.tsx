@@ -142,7 +142,7 @@ export default function MyChoirsPage() {
         <ul className="list-music">
           {choirs.map((c) => (
             <div key={c.id} className="card-music orange">
-              <i className="fa fa-music note"></i>
+              <i className="fa fa-users note"></i>
               {/* Clic sur le texte → page de la chorale */}
               <div className="text" onClick={() => navigate(`/choir/${c.id}`)} style={{ cursor: 'pointer' }}>
                 <strong>{c.name}</strong>
@@ -174,6 +174,7 @@ export default function MyChoirsPage() {
             onClick={() => navigate('/create-choir')}
             style={{ marginBottom: '0.5rem' }}
           >
+            <i className="fa fa-users"></i> &nbsp; 
             Créer une chorale
           </button>
         </div>
@@ -184,6 +185,7 @@ export default function MyChoirsPage() {
           className="page-button"
           onClick={() => navigate('/join-choir')}
         >
+          <i className="fa fa-users"></i> &nbsp; 
           Rejoindre une chorale
         </button>
       </div>
