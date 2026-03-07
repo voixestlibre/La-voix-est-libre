@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
+import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 
 export default function MyChoirsPage() {
@@ -13,7 +14,7 @@ export default function MyChoirsPage() {
   useEffect(() => {
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté (peut être null si non connecté)
-      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = await getCurrentUser();
 
       // Lire les chorales rejointes depuis le localStorage
       // Format : [{ code: '12345678', name: 'Ma chorale' }, ...]
@@ -21,71 +22,56 @@ export default function MyChoirsPage() {
         .filter((c: any) => c !== null);
       const joinedCodes = joined.map((c: any) => c.code);
 
-      if (userData.user) {
+      if (currentUser) {
         // ── CAS 1 : Utilisateur connecté ──────────────────────────────
-        setUser(userData.user);
+        setUser(currentUser);
         try {
           // Récupérer le quota de chorales autorisées pour cet utilisateur
-          const { data: param } = await supabase
-            .from('users_param')
-            .select('choirs_nb')
-            .eq('email', userData.user.email)
-            .single();
+          const param = await getUserParam(currentUser.email!);
 
           // Récupérer les chorales dont l'utilisateur est propriétaire
-          const { data: choirData, error } = await supabase
-            .from('choirs')
-            .select('*')
-            .eq('owner_id', userData.user.id);
+          const choirData = await getOwnedChoirs(currentUser.id);
 
           // Déterminer si l'utilisateur peut encore créer une chorale
           if (param) {
-            setCanCreate((choirData?.length ?? 0) < param.choirs_nb);
+            setCanCreate(choirData.length < param.choirs_nb);
           }
 
-          if (error) {
-            console.error(error);
-            setChoirs([]);
-          } else {
-            // Synchroniser les chorales propriétaires dans le localStorage
-            const current = JSON.parse(localStorage.getItem('joined_choirs') || '[]')
-              .filter((c: any) => c !== null);
-            const updated = [...current];
-            choirData?.forEach((c) => {
-              if (!updated.find((existing: any) => String(existing.code) === String(c.code))) {
-                updated.push({ code: String(c.code), name: c.name });
+          // Synchroniser les chorales propriétaires dans le localStorage
+          const current = JSON.parse(localStorage.getItem('joined_choirs') || '[]')
+            .filter((c: any) => c !== null);
+          const updated = [...current];
+          choirData.forEach((c) => {
+            if (!updated.find((existing: any) => String(existing.code) === String(c.code))) {
+              updated.push({ code: String(c.code), name: c.name });
+            }
+          });
+
+          if (joinedCodes.length > 0) {
+            // Récupérer en base les chorales rejointes via localStorage
+            const joinedData = await getChoirsByCodes(joinedCodes);
+
+            // Purger en gardant les chorales rejointes valides ET les chorales propriétaires
+            const validCodes = [
+              ...joinedData.map((c) => String(c.code)),
+              ...choirData.map((c) => String(c.code)),
+            ];
+            localStorage.setItem('joined_choirs', JSON.stringify(
+              updated.filter((c: any) => validCodes.includes(String(c.code)))
+            ));
+
+            // Fusionner les chorales propres + les chorales rejointes (sans doublons)
+            const allChoirs = [...choirData];
+            joinedData.forEach((c) => {
+              if (!allChoirs.find((existing) => existing.id === c.id)) {
+                allChoirs.push(c);
               }
             });
-
-            if (joinedCodes.length > 0) {
-              // Récupérer en base les chorales rejointes via localStorage
-              const { data: joinedData } = await supabase
-                .from('choirs')
-                .select('*')
-                .in('code', joinedCodes);
-
-              // Purger en gardant les chorales rejointes valides ET les chorales propriétaires
-              const validCodes = [
-                ...(joinedData?.map((c) => String(c.code)) ?? []),
-                ...(choirData?.map((c) => String(c.code)) ?? []),
-              ];
-              localStorage.setItem('joined_choirs', JSON.stringify(
-                updated.filter((c: any) => validCodes.includes(String(c.code)))
-              ));
-
-              // Fusionner les chorales propres + les chorales rejointes (sans doublons)
-              const allChoirs = [...(choirData || [])];
-              joinedData?.forEach((c) => {
-                if (!allChoirs.find((existing) => existing.id === c.id)) {
-                  allChoirs.push(c);
-                }
-              });
-              setChoirs(allChoirs);
-            } else {
-              // Pas de chorales rejointes : sauvegarder et afficher uniquement les chorales propres
-              localStorage.setItem('joined_choirs', JSON.stringify(updated));
-              setChoirs(choirData || []);
-            }
+            setChoirs(allChoirs);
+          } else {
+            // Pas de chorales rejointes : sauvegarder et afficher uniquement les chorales propres
+            localStorage.setItem('joined_choirs', JSON.stringify(updated));
+            setChoirs(choirData);
           }
         } catch {
           // Fallback offline : Supabase inaccessible, afficher le localStorage
@@ -96,18 +82,15 @@ export default function MyChoirsPage() {
         if (joinedCodes.length > 0) {
           try {
             // Récupérer en base les chorales rejointes via localStorage
-            const { data: joinedData } = await supabase
-              .from('choirs')
-              .select('*')
-              .in('code', joinedCodes);
+            const joinedData = await getChoirsByCodes(joinedCodes);
 
             // Purger le localStorage : supprimer les chorales qui n'existent plus en base
-            const validCodes = joinedData?.map((c) => String(c.code)) ?? [];
+            const validCodes = joinedData.map((c) => String(c.code));
             localStorage.setItem('joined_choirs', JSON.stringify(
               joined.filter((c: any) => validCodes.includes(String(c.code)))
             ));
 
-            setChoirs(joinedData || []);
+            setChoirs(joinedData);
           } catch {
             // Fallback offline : Supabase inaccessible, afficher le localStorage
             setChoirs(joined.map((c: any) => ({ id: c.code, name: c.name, code: c.code })));
@@ -134,8 +117,7 @@ export default function MyChoirsPage() {
       </div>
       <h2>Mes chorales</h2>
 
-      {loading ? (
-        <p>Chargement...</p>
+      {loading ? ( <div className="spinner"></div>
       ) : choirs.length === 0 ? (
         <p>Vous n'avez aucune chorale.</p>
       ) : (
@@ -174,7 +156,7 @@ export default function MyChoirsPage() {
             onClick={() => navigate('/create-choir')}
             style={{ marginBottom: '0.5rem' }}
           >
-            <i className="fa fa-users"></i> &nbsp; 
+            <i className="fa fa-users"></i> &nbsp;
             Créer une chorale
           </button>
         </div>
@@ -185,7 +167,7 @@ export default function MyChoirsPage() {
           className="page-button"
           onClick={() => navigate('/join-choir')}
         >
-          <i className="fa fa-users"></i> &nbsp; 
+          <i className="fa fa-users"></i> &nbsp;
           Rejoindre une chorale
         </button>
       </div>

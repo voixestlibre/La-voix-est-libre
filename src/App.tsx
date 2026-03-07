@@ -6,8 +6,9 @@ import ChoirDeletePage from './ui/pages/ChoirDeletePage';
 import ChoirLeavePage from './ui/pages/ChoirLeavePage';
 import ChoirPage from './ui/pages/ChoirPage';
 import ChoirJoinPage from './ui/pages/ChoirJoinPage';
-import SongCreationPage from './ui/pages/SongCreationPage';
+import SongEditPage from './ui/pages/SongEditPage';
 import SongPage from './ui/pages/SongPage';
+import SongDeletePage from './ui/pages/SongDeletePage';
 import LoginPage from './ui/pages/LoginPage';
 import ResetRequestPage from './ui/pages/ResetRequestPage';
 import ResetPasswordPage from './ui/pages/ResetPasswordPage';
@@ -23,8 +24,10 @@ export default function App() {
         <Route path="/leave-choir/:id" element={<ChoirLeavePage />} />  
         <Route path="/choir/:id" element={<ChoirPage />} />  
         <Route path="/join-choir" element={<ChoirJoinPage />} />  
-        <Route path="/add-song/:choirId" element={<SongCreationPage />} />  
+        <Route path="/add-song/:choirId" element={<SongEditPage />} />  
+        <Route path="/edit-song/:songId" element={<SongEditPage />} />  
         <Route path="/song/:songId" element={<SongPage />} />  
+        <Route path="/delete-song/:id" element={<SongDeletePage />} />  
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-request" element={<ResetRequestPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

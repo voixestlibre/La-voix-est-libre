@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getChoirByCode } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 
 export default function ChoirJoinPage() {
@@ -13,8 +14,8 @@ export default function ChoirJoinPage() {
 
   // Vérifier si l'utilisateur est connecté au chargement
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUser(data.user);
+    getCurrentUser().then((currentUser) => {
+      if (currentUser) setUser(currentUser);
     });
   }, []);
 
@@ -34,7 +35,7 @@ export default function ChoirJoinPage() {
     }
   };
 
-  // Recherche de la chorale en base et redirection
+  // Recherche de la chorale par son code et redirection
   const handleJoin = async () => {
     const code = groups.join('');
     if (code.length < 8) {
@@ -44,26 +45,21 @@ export default function ChoirJoinPage() {
     setLoading(true);
     setError('');
 
-    const { data, error } = await supabase
-      .from('choirs')
-      .select('id, code, name')
-      .eq('code', code)
-      .single();
+    try {
+      const data = await getChoirByCode(code);
 
-    if (error || !data) {
+      // Stocker la chorale dans le localStorage si pas déjà présente
+      const existing = JSON.parse(localStorage.getItem('joined_choirs') || '[]');
+      if (!existing.find((c: any) => c.code === data.code)) {
+        existing.push({ code: data.code, name: data.name });
+        localStorage.setItem('joined_choirs', JSON.stringify(existing));
+      }
+
+      navigate(`/choir/${data.id}`);
+    } catch {
       setError('Code invalide...');
-      setLoading(false);
-      return;
     }
 
-    // Stocker le code dans le localStorage
-    const existing = JSON.parse(localStorage.getItem('joined_choirs') || '[]');
-    if (!existing.find((c: any) => c.code === data.code)) {
-      existing.push({ code: data.code, name: data.name });
-      localStorage.setItem('joined_choirs', JSON.stringify(existing));
-    }
-
-    navigate(`/choir/${data.id}`);
     setLoading(false);
   };
 

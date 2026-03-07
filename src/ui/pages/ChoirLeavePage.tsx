@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getChoir } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 
 export default function LeaveChoirPage() {
@@ -11,19 +12,17 @@ export default function LeaveChoirPage() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est connecté
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUser(data.user);
-    });
+    const init = async () => {
+      // Vérifier si l'utilisateur est connecté
+      const currentUser = await getCurrentUser();
+      if (currentUser) setUser(currentUser);
 
-    const fetchChoir = async () => {
-      const { data, error } = await supabase
-        .from('choirs')
-        .select('name, code')
-        .eq('id', id)
-        .single();
-
-      if (error || !data) {
+      try {
+        // Récupérer la chorale depuis la base
+        const data = await getChoir(id!);
+        setChoirName(data.name);
+        setChoirCode(String(data.code));
+      } catch {
         // Fallback offline : chercher dans le localStorage
         const joined = JSON.parse(localStorage.getItem('joined_choirs') || '[]')
           .filter((c: any) => c !== null);
@@ -34,12 +33,9 @@ export default function LeaveChoirPage() {
         } else {
           navigate('/my-choirs');
         }
-        return;
       }
-      setChoirName(data.name);
-      setChoirCode(String(data.code));
     };
-    fetchChoir();
+    init();
   }, [id, navigate]);
 
   const handleLeave = () => {

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getChoir } from '../../infrastructure/storage/choirsService';
+import { getChoirSongs } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 
 export default function ChoirPage() {
@@ -15,37 +17,34 @@ export default function ChoirPage() {
   useEffect(() => {
     const fetchChoir = async () => {
       // Récupérer l'utilisateur connecté (peut être null)
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData.user) setUser(userData.user);
+      const currentUser = await getCurrentUser();
+      if (currentUser) setUser(currentUser);
 
-      // Récupérer la chorale sans restriction
-      const { data, error } = await supabase
-        .from('choirs')
-        .select('*')
-        .eq('id', id)
-        .single();
+      try {
+        // Récupérer la chorale
+        const data = await getChoir(id!);
+        setChoir(data);
 
-      if (error || !data) { navigate('/'); return; }
-      setChoir(data);
+        // Vérifier si l'utilisateur connecté est le propriétaire
+        if (currentUser && data.owner_id === currentUser.id) {
+          setIsOwner(true);
+        }
 
-      // Vérifier si l'utilisateur connecté est le propriétaire
-      if (userData.user && data.owner_id === userData.user.id) {
-        setIsOwner(true);
+        // Récupérer les chants de la chorale triés par titre
+        const songsData = await getChoirSongs(id!);
+        setSongs(songsData);
+      } catch {
+        navigate('/');
+        return;
       }
-
-      // Récupérer les chants de la chorale
-      const { data: songsData } = await supabase
-        .from('songs')
-        .select('*')
-        .eq('choir_id', id)
-        .order('title');
-      setSongs(songsData || []);
 
       setLoading(false);
     };
     fetchChoir();
   }, [id, navigate]);
 
+  // Formater le code en groupes de 2 chiffres séparés par des tirets
+  // Ex : "51056723" → "51-05-67-23"
   const formatCode = (code: string) => code.match(/.{1,2}/g)?.join('-') ?? code;
 
   return (
@@ -54,9 +53,7 @@ export default function ChoirPage() {
         <Link to="/my-choirs" className="navigation">←</Link>
         {user && <Link to="/login" className="navigation">⎋</Link>}
       </div>
-      {loading ? (
-        <p>Chargement...</p>
-      ) : (
+      {loading ? ( <div className="spinner"></div> ) : (
         <>
           <h2>{choir.name}</h2>
           <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
@@ -75,7 +72,16 @@ export default function ChoirPage() {
                     style={{ cursor: 'pointer' }}
                   >
                     <strong>{s.title}</strong>
+                    {/* Affichage des hashtags sous forme de pills */}
+                    {s.hashtags && s.hashtags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
+                        {s.hashtags.map((tag: string) => (
+                          <span key={tag} className="hashtag-pill">{tag}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  {/* Icône suppression visible uniquement pour le propriétaire */}
                   {isOwner && (
                     <i
                       className="fa fa-trash trash"
@@ -95,7 +101,7 @@ export default function ChoirPage() {
                   className="page-button"
                   onClick={() => navigate(`/add-song/${choir.id}`)}
                 >
-                  <i className="fa fa-music"></i> &nbsp; 
+                  <i className="fa fa-music"></i> &nbsp;
                   Ajouter un chant
                 </button>
               </div>
@@ -105,7 +111,7 @@ export default function ChoirPage() {
                   onClick={() => navigate(`/delete-choir/${choir.id}`)}
                   style={{ marginTop: '1.5rem' }}
                 >
-                  <i className="fa fa-users"></i> &nbsp; 
+                  <i className="fa fa-users"></i> &nbsp;
                   Supprimer la chorale
                 </button>
               </div>
@@ -116,7 +122,7 @@ export default function ChoirPage() {
               onClick={() => navigate(`/leave-choir/${choir.id}`)}
               style={{ marginTop: '1.5rem' }}
             >
-              <i className="fa fa-users"></i> &nbsp; 
+              <i className="fa fa-users"></i> &nbsp;
               Quitter la chorale
             </button>
           )}

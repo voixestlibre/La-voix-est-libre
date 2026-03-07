@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser } from '../../infrastructure/storage/authService';
+import {
+  getSong,
+  getSongFiles,
+  fileExists,
+  uploadSongFile,
+  deleteSongFile,
+  getSongFileUrl,
+} from '../../infrastructure/storage/songsService';
+import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 
 export default function SongPage() {
@@ -33,29 +42,27 @@ export default function SongPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData.user) setUser(userData.user);
+      // Récupérer l'utilisateur connecté
+      const currentUser = await getCurrentUser();
+      if (currentUser) setUser(currentUser);
 
-      // Récupérer le chant
-      const { data: songData, error } = await supabase
-        .from('songs')
-        .select('*')
-        .eq('id', songId)
-        .single();
-      if (error || !songData) { navigate('/'); return; }
-      setSong(songData);
+      try {
+        // Récupérer le chant
+        const songData = await getSong(songId!);
+        setSong(songData);
 
-      // Récupérer le propriétaire de la chorale et vérifier si connecté = propriétaire
-      const { data: choirData } = await supabase
-        .from('choirs')
-        .select('owner_id')
-        .eq('id', songData.choir_id)
-        .single();
-      if (userData.user && choirData?.owner_id === userData.user.id) {
-        setIsOwner(true);
+        // Vérifier si l'utilisateur connecté est le propriétaire de la chorale
+        const ownerId = await getChoirOwner(songData.choir_id);
+        if (currentUser && ownerId === currentUser.id) {
+          setIsOwner(true);
+        }
+
+        await fetchFiles();
+      } catch {
+        navigate('/');
+        return;
       }
 
-      await fetchFiles();
       setLoading(false);
     };
     fetchData();
@@ -69,9 +76,24 @@ export default function SongPage() {
     };
   }, [songId, navigate]);
 
+  // Lister les fichiers du dossier songId dans le bucket
   const fetchFiles = async () => {
-    const { data } = await supabase.storage.from('songs-files').list(songId);
-    setFiles(data || []);
+    const data = await getSongFiles(songId!);
+    const sorted = [...data].sort((a, b) => {
+      const extA = a.name.split('.').pop()?.toLowerCase() || '';
+      const extB = b.name.split('.').pop()?.toLowerCase() || '';
+      const isAudioA = ['mp3', 'wav', 'ogg', 'm4a'].includes(extA);
+      const isAudioB = ['mp3', 'wav', 'ogg', 'm4a'].includes(extB);
+  
+      // PDF avant audio
+      if (isAudioA !== isAudioB) return isAudioA ? 1 : -1;
+  
+      // Ordre alphabétique sur le nom sans extension
+      const nameA = a.name.split('.').slice(0, -1).join('.');
+      const nameB = b.name.split('.').slice(0, -1).join('.');
+      return nameA.localeCompare(nameB);
+    });
+    setFiles(sorted);
   };
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -80,35 +102,33 @@ export default function SongPage() {
       setMessage('Veuillez renseigner un nom et sélectionner un fichier.');
       return;
     }
+
+    // Vérifier l'absence de caractères interdits dans le nom
     const forbiddenChars = /[#?&%+\\/:*"<>|]/;
     if (forbiddenChars.test(label)) {
       setMessage('Le nom ne doit pas contenir de caractères spéciaux : # ? & % + \\ / : * " < > |');
-      setUploading(false);
       return;
     }
+
     setUploading(true);
     setMessage('');
 
     try {
       // Construire le nom final : label saisi + extension du fichier original
-      // Ex : label="Soprano", fichier="partition3.pdf" → "Soprano.pdf"
+      // Ex : label="Ténor 2", fichier="tenor.mp3" → "Tenor 2.mp3"
       const ext = file.name.split('.').pop();
-      const finalName = `${label}.${ext}`;
-      const filePath = `${songId}/${finalName}`;
+      const cleanLabel = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const finalName = `${cleanLabel}.${ext}`;
 
       // Vérifier si un fichier avec le même nom existe déjà dans le bucket
-      const { data: existing } = await supabase.storage.from('songs-files').list(songId);
-      if (existing?.some((f) => f.name === finalName)) {
+      if (await fileExists(songId!, finalName)) {
         setMessage(`Un fichier "${finalName}" existe déjà pour ce chant.`);
         setUploading(false);
         return;
       }
 
       // Upload du fichier dans le bucket
-      const { error: uploadError } = await supabase.storage
-        .from('songs-files')
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
+      await uploadSongFile(songId!, finalName, file);
 
       // Réinitialiser le formulaire (y compris l'input file via sa ref)
       setLabel('');
@@ -121,14 +141,15 @@ export default function SongPage() {
     setUploading(false);
   };
 
-  // Supprimer un fichier du bucket
+  // Supprimer un fichier du bucket (avec confirmation)
   const handleDeleteFile = async (fileName: string) => {
     if (!window.confirm(`Êtes-vous sûr de vouloir supprimer "${fileName}" ?`)) return;
-    const { error } = await supabase.storage
-      .from('songs-files')
-      .remove([`${songId}/${fileName}`]);
-    if (error) { alert(`Erreur : ${error.message}`); return; }
-    await fetchFiles();
+    try {
+      await deleteSongFile(songId!, fileName);
+      await fetchFiles();
+    } catch (err: any) {
+      setMessage(`Erreur lors de la suppression : ${err.message}`);
+    }
   };
 
   // Déterminer l'icône Font Awesome selon l'extension du fichier
@@ -140,12 +161,7 @@ export default function SongPage() {
   };
 
   // Obtenir l'URL publique d'un fichier dans le bucket
-  const getPublicUrl = (fileName: string) => {
-    const { data } = supabase.storage
-      .from('songs-files')
-      .getPublicUrl(`${songId}/${fileName}`);
-    return data.publicUrl;
-  };
+  const getPublicUrl = (fileName: string) => getSongFileUrl(songId!, fileName);
 
   // Déterminer si fichier audio
   const isAudio = (fileName: string) =>
@@ -155,7 +171,7 @@ export default function SongPage() {
   const isPdf = (fileName: string) =>
     fileName.split('.').pop()?.toLowerCase() === 'pdf';
 
-  // Ouvrir un fichier selon sa forme
+  // Ouvrir un fichier selon son type
   const handleFileClick = (fileName: string) => {
     const url = getPublicUrl(fileName);
     if (isPdf(fileName)) {
@@ -175,9 +191,17 @@ export default function SongPage() {
         {user && <Link to="/login" className="navigation">⎋</Link>}
       </div>
 
-      {loading ? <p>Chargement...</p> : (
+      {loading ? <div className="spinner"></div> : (
         <>
           <h2>{song.title}</h2>
+
+          {song.hashtags?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0' }}>
+              {song.hashtags.map((tag: string) => (
+                <span key={tag} className="hashtag-pill">{tag}</span>
+              ))}
+            </div>
+          )}
 
           {/* Liste des fichiers du chant */}
           {files.length === 0 ? (
@@ -187,7 +211,11 @@ export default function SongPage() {
               {files.map((f) => (
                 <div key={f.name} className="card-music">
                   {/* Icône selon le type de fichier */}
-                  <i className={`fa ${getIcon(f.name)} note`}></i>
+                  <i
+                    className={`fa ${getIcon(f.name)} note`}
+                    onClick={() => handleFileClick(f.name)}
+                    style={{ cursor: 'pointer' }}
+                  ></i>
                   <div
                     className="text"
                     onClick={() => handleFileClick(f.name)}
@@ -195,6 +223,7 @@ export default function SongPage() {
                   >
                     <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
                   </div>
+                  {/* Icône suppression visible uniquement pour le propriétaire */}
                   {isOwner && (
                     <i
                       className="fa fa-trash trash"
@@ -250,12 +279,31 @@ export default function SongPage() {
                   {uploading ? 'Envoi...' : 'Ajouter'}
                 </button>
               </form>
+              <div>
+                <button
+                  className="page-button pink"
+                  onClick={() => navigate(`/edit-song/${song.id}`)}
+                  style={{ marginTop: '1.5rem' }}
+                >
+                  <i className="fa fa-music"></i> &nbsp; 
+                  Modifier le chant
+                </button>
+              </div>
+              <div>
+                <button
+                  className="page-button pink"
+                  onClick={() => navigate(`/delete-song/${song.id}`)}
+                  style={{ marginTop: '1.5rem' }}
+                >
+                  <i className="fa fa-music"></i> &nbsp; 
+                  Supprimer le chant
+                </button>
+              </div>
               {message && <p style={{ color: 'red' }}>{message}</p>}
             </>
           )}
         </>
       )}
-
 
       {/* Overlay PDF plein écran */}
       {pdfUrl && (
@@ -344,12 +392,11 @@ export default function SongPage() {
           {/* PDF avec paramètres pour masquer toolbar et panneau latéral sur mobile */}
           <iframe
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-            style={{ flex: 1, border: 'none' }}
+            style={{ flex: 1, border: 'none', width: '100%', display: 'block' }}
             title="Partition"
           />
         </div>
-      )}                    
-
+      )}
 
       {/* Popup flottant lecteur audio (uniquement si PDF non ouvert) */}
       {audioUrl && !pdfUrl && (
@@ -378,7 +425,6 @@ export default function SongPage() {
           />
         </div>
       )}
-
 
     </div>
   );
