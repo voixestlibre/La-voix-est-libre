@@ -59,6 +59,7 @@ export default function ChoirPage() {
       ) : (
         <>
           <h2>{choir.name}</h2>
+          <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
 
           {/* Liste des chants */}
           {songs.length === 0 ? (
