@@ -49,3 +49,20 @@ export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }
+
+// Récupérer l'utilisateur connecté (null si non connecté)
+export async function getCurrentUser() {
+  const { data } = await supabase.auth.getUser();
+  return data.user;
+}
+
+// Récupérer le quota de chorales autorisées pour un utilisateur
+export async function getUserParam(email: string) {
+  const { data, error } = await supabase
+    .from('users_param')
+    .select('choirs_nb')
+    .eq('email', email)
+    .single();
+  if (error) throw error;
+  return data;
+}

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getChoir, deleteChoir } from '../../infrastructure/storage/choirsService';
+import { countChoirSongs, getChoirSongIds, deleteSong } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 
 export default function DeleteChoirPage() {
@@ -9,44 +11,45 @@ export default function DeleteChoirPage() {
   const [choirName, setChoirName] = useState('');
   const [songsCount, setSongsCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const fetchChoir = async () => {
       // Vérifier que l'utilisateur est connecté
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) { navigate('/'); return; }
+      const currentUser = await getCurrentUser();
+      if (!currentUser) { navigate('/'); return; }
 
       // Récupérer la chorale et vérifier qu'elle appartient à l'utilisateur
-      const { data } = await supabase
-        .from('choirs')
-        .select('name, owner_id')
-        .eq('id', id)
-        .single();
-      if (!data || data.owner_id !== userData.user.id) { navigate('/'); return; }
-      setChoirName(data.name);
+      try {
+        const data = await getChoir(id!);
+        if (data.owner_id !== currentUser.id) { navigate('/'); return; }
+        setChoirName(data.name);
 
-      // Compter les chants rattachés à la chorale
-      const { count } = await supabase
-        .from('songs')
-        .select('*', { count: 'exact', head: true })
-        .eq('choir_id', id);
-      setSongsCount(count ?? 0);
+        // Compter les chants rattachés à la chorale
+        const count = await countChoirSongs(id!);
+        setSongsCount(count);
+      } catch {
+        navigate('/');
+      }
     };
     fetchChoir();
   }, [id, navigate]);
 
   const handleDelete = async () => {
     setLoading(true);
+    try {
+      // Récupérer les ids de tous les chants et les supprimer un par un
+      // (deleteSong supprime aussi les fichiers dans le bucket)
+      const songIds = await getChoirSongIds(id!);
+      for (const songId of songIds) {
+        await deleteSong(songId);
+      }
 
-    // Supprimer les chants rattachés à la chorale
-    await supabase.from('songs').delete().eq('choir_id', id);
-
-    // Supprimer la chorale
-    const { error } = await supabase.from('choirs').delete().eq('id', id);
-    if (error) {
-      alert(`Erreur : ${error.message}`);
-    } else {
+      // Supprimer la chorale
+      await deleteChoir(id!);
       navigate('/my-choirs');
+    } catch (err: any) {
+      setMessage(`Erreur lors de la suppression : ${err.message}`);
     }
     setLoading(false);
   };
@@ -76,6 +79,7 @@ export default function DeleteChoirPage() {
           Annuler
         </button>
       </div>
+      {message && <p style={{ color: 'red' }}>{message}</p>}
     </div>
   );
 }

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import '../../App.css';
 import type { FormEvent } from 'react';
-import { createChoir } from '../../infrastructure/storage/choirsService';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
+import { createChoir, countOwnedChoirs } from '../../infrastructure/storage/choirsService';
+import '../../App.css';
 
 export default function CreationPage() {
   const [choraleName, setChoraleName] = useState('');
@@ -11,54 +11,46 @@ export default function CreationPage() {
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<any>(null);
   const [canCreate, setCanCreate] = useState(true);
-
   const navigate = useNavigate();
 
-  // Vérifier que l'utilisateur est connecté ...
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        navigate('/');       // ... sinon redirection immédiate
-      } else {
-        setUser(data.user);
+    const init = async () => {
+      // Vérifier que l'utilisateur est connecté, sinon redirection
+      const currentUser = await getCurrentUser();
+      if (!currentUser) { navigate('/'); return; }
+      setUser(currentUser);
 
-        // Récupérer choirs_nb depuis users_param
-        const { data: param } = await supabase
-        .from('users_param')
-        .select('choirs_nb')
-        .eq('email', data.user.email)
-        .single();
+      // Récupérer le quota de chorales autorisées
+      const param = await getUserParam(currentUser.email!);
 
-        // Compter les chorales existantes
-        const { count } = await supabase
-          .from('choirs')
-          .select('*', { count: 'exact', head: true })
-          .eq('owner_id', data.user.id);
+      // Compter les chorales existantes
+      const count = await countOwnedChoirs(currentUser.id);
 
-        if (param && count !== null && count >= param.choirs_nb) {
-          setCanCreate(false);
-        }          
+      // Désactiver la création si le quota est atteint
+      if (param && count >= param.choirs_nb) {
+        setCanCreate(false);
       }
     };
-    getUser();
+    init();
   }, [navigate]);
 
-  // Validation du formulaire de création
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
 
     try {
+      // Créer la chorale en base
       const choir = await createChoir(choraleName, user.id);
-      // Stockage deans local storage
+
+      // Stocker la chorale dans le localStorage
       const existing = JSON.parse(localStorage.getItem('joined_choirs') || '[]')
         .filter((c: any) => c !== null);
       existing.push({ code: choir.code, name: choraleName });
-      localStorage.setItem('joined_choirs', JSON.stringify(existing));  
-      // Renvoi vers liste des chorales    
-      navigate('/my-choirs');
+      localStorage.setItem('joined_choirs', JSON.stringify(existing));
+
+      // Rediriger vers la liste des chorales
+      navigate(`/choir/${choir.id}`);
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
     }
@@ -93,7 +85,7 @@ export default function CreationPage() {
       {!message && !canCreate && (
         <p>Vous avez atteint le nombre maximum de chorales autorisées.</p>
       )}
-      
+
       {message && <p>{message}</p>}
     </div>
   );
