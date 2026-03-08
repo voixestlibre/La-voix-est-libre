@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
-import { login, signOut } from '../../infrastructure/storage/authService';
+import { getCurrentUser, login, signOut } from '../../infrastructure/storage/authService';
 import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
 import '../../App.css';
 
@@ -11,21 +10,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<{ email: string; isAdmin: boolean } | null>(null);
-
   const navigate = useNavigate();
 
-  // Vérifie si l'utilisateur est déjà connecté
+  // Vérifier si l'utilisateur est déjà connecté au chargement
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        setUser({ email: data.user.email!, isAdmin: false });
+    const init = async () => {
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        setUser({ email: currentUser.email!, isAdmin: false });
       }
     };
-    getUser();
+    init();
   }, []);
 
-  // A la validation du formulaire de login
+  // Validation du formulaire de connexion
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -33,14 +31,15 @@ export default function LoginPage() {
 
     try {
       const result = await login(email, password);
-      setMessage(result.message);      
+      setMessage(result.message);
 
-      // Redirections
       if (result.isNewUser) {
-        navigate('/reset-request'); 
+        // Nouvel utilisateur créé via MAGIC_SECRET → rediriger vers la réinitialisation du mot de passe
+        navigate('/reset-request');
       } else {
+        // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
         setUser({ email: result.email!, isAdmin: result.isAdmin });
-        navigate('/'); 
+        navigate('/');
       }
     } catch (err: any) {
       setMessage(translateSupabaseError(err.message));
@@ -49,7 +48,7 @@ export default function LoginPage() {
     }
   };
 
-  // Fonction de log Out
+  // Déconnexion
   const handleLogout = async () => {
     await signOut();
     navigate('/');
@@ -63,15 +62,16 @@ export default function LoginPage() {
 
       {user ? (
         <>
+          {/* Utilisateur connecté : afficher son email et le bouton de déconnexion */}
           <h2>Déconnexion</h2>
           <p>Utilisateur connecté : {user.email}</p>
           <button type="button" className="page-button" onClick={handleLogout}>
             Se déconnecter
           </button>
         </>
-              
       ) : (
         <>
+          {/* Formulaire de connexion */}
           <h2>Connexion</h2>
           <form onSubmit={handleSubmit}>
             <input
@@ -95,6 +95,7 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Lien vers la réinitialisation du mot de passe */}
           <button
             type="button"
             className="page-button2"
