@@ -108,7 +108,7 @@ export default function EventPage() {
           {/* Boutons propriétaire uniquement */}
           {isOwner && (
             <>
-              <div style={{ marginTop: '1.5rem' }}>
+              <div style={{ marginTop: '2.5rem' }}>
                 <button
                   className="page-button pink"
                   onClick={() => navigate(`/edit-event/${event.id}`)}

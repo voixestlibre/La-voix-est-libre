@@ -78,7 +78,11 @@ export default function ImportSongPage() {
         // Nettoyer les accents du nom
         const ext = file.name.split('.').pop()!;
         const baseName = file.name.slice(0, -(ext.length + 1));
-        const cleanName = baseName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const cleanName = baseName
+          .replace(/œ/g, 'oe').replace(/Œ/g, 'Oe')
+          .replace(/æ/g, 'ae').replace(/Æ/g, 'Ae')
+          .replace(/[,;]/g, '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');        
         const finalName = `${cleanName}.${ext}`;
 
         // Vérifier si le fichier existe déjà
@@ -168,7 +172,7 @@ export default function ImportSongPage() {
       </div>
 
       <h2>Importer des chants</h2>
-      {reports.length === 0 && <p>Déposez un ou plusieurs répertoires contenant les fichiers audio et PDF.</p>}
+      {reports.length === 0 && <div><p>Déposez un ou plusieurs répertoires contenant les fichiers audio et PDF.</p><p>Le nom de chaque répertoire sera utilisé pour créer un chant, et les différents fichiers audio ou pdf des répertoires seront associés aux chants correspondants...</p></div>}
 
       {/* Zone de drop */}
       {reports.length === 0 && (

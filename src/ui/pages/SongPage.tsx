@@ -8,6 +8,8 @@ import {
   uploadSongFile,
   deleteSongFile,
   getSongFileUrl,
+  updateSong,
+  getChoirHashtags,
 } from '../../infrastructure/storage/songsService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
@@ -20,6 +22,13 @@ export default function SongPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Ajout d'hashtags
+  const [showHashtagInput, setShowHashtagInput] = useState(false);
+  const [quickHashtagInput, setQuickHashtagInput] = useState('');
+  const [allHashtags, setAllHashtags] = useState<string[]>([]);
+  const [hashtagSuggestions, setHashtagSuggestions] = useState<string[]>([]);  
+  const clickedSuggestionRef = useRef<string | null>(null);
 
   // Formulaire ajout fichier
   const [label, setLabel] = useState('');
@@ -53,6 +62,9 @@ export default function SongPage() {
         // Récupérer le chant
         const songData = await getSong(songId!);
         setSong(songData);
+
+        const known = await getChoirHashtags(songData.choir_id);
+        setAllHashtags(known);
 
         // Vérifier si l'utilisateur connecté est le propriétaire de la chorale
         const ownerId = await getChoirOwner(songData.choir_id);
@@ -103,6 +115,26 @@ export default function SongPage() {
     setFiles(sorted);
   };
 
+  // Ajouter un hashtag directement depuis la page du chant
+  const handleQuickAddHashtag = async (value: string) => {
+    const clean = value.trim().replace(/^#+/, '');
+    if (!clean) return;
+    const noAccent = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const capitalized = noAccent.charAt(0).toUpperCase() + noAccent.slice(1);
+    const tag = `#${capitalized}`;
+    const updatedHashtags = song.hashtags?.includes(tag)
+      ? song.hashtags
+      : [...(song.hashtags || []), tag];
+    try {
+      await updateSong(song.id, song.title, updatedHashtags);
+      setSong({ ...song, hashtags: updatedHashtags });
+    } catch (err: any) {
+      setMessage(`Erreur : ${err.message}`);
+    }
+    setQuickHashtagInput('');
+    setShowHashtagInput(false);
+  };    
+
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!file || !label) {
@@ -123,7 +155,11 @@ export default function SongPage() {
     try {
       // Construire le nom final : label sans accents + extension du fichier original
       const ext = file.name.split('.').pop();
-      const cleanLabel = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const cleanLabel = label
+        .replace(/œ/g, 'oe').replace(/Œ/g, 'Oe')
+        .replace(/æ/g, 'ae').replace(/Æ/g, 'Ae')
+        .replace(/[,;]/g, '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const finalName = `${cleanLabel}.${ext}`;
 
       // Vérifier si un fichier avec le même nom existe déjà
@@ -211,14 +247,109 @@ export default function SongPage() {
             <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
             {song.title}
           </h2>
-          {/* Hashtags du chant */}
-          {song.hashtags?.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0' }}>
-              {song.hashtags.map((tag: string) => (
-                <span key={tag} className="hashtag-pill">{tag}</span>
-              ))}
-            </div>
-          )}
+
+          {/* Hashtags du chant + ajout rapide si propriétaire */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0', alignItems: 'center' }}>
+            {song.hashtags?.map((tag: string) => (
+              <span key={tag} className="hashtag-pill">{tag}</span>
+            ))}
+
+            {/* Bulle rose "Ajouter un hashtag" (propriétaire uniquement) */}
+            {isOwner && !showHashtagInput && (
+              <span
+                onClick={() => setShowHashtagInput(true)}
+                style={{
+                  backgroundColor: '#DA486D', color: 'white',
+                  borderRadius: '20px', padding: '0.3rem 0.8rem',
+                  fontSize: '0.85rem', cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                  lineHeight: 1,
+                }}
+              >
+                <i className="fa fa-plus"></i> Ajouter un hashtag
+              </span>
+            )}
+
+            {/* Champ de saisie rapide avec suggestions */}
+            {isOwner && showHashtagInput && (
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Hashtag..."
+                  value={quickHashtagInput}
+                  onChange={(e) => {
+                    setQuickHashtagInput(e.target.value);
+                    const search = e.target.value.toLowerCase();
+                    setHashtagSuggestions(
+                      search.trim().length === 0 ? [] :
+                      allHashtags.filter(
+                        (h) => h.toLowerCase().includes(search) && !song.hashtags?.includes(h)
+                      )
+                    );
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleQuickAddHashtag(quickHashtagInput);
+                      setHashtagSuggestions([]);
+                    }
+                    if (e.key === 'Escape') {
+                      setShowHashtagInput(false);
+                      setQuickHashtagInput('');
+                      setHashtagSuggestions([]);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      if (clickedSuggestionRef.current) {
+                        handleQuickAddHashtag(clickedSuggestionRef.current);
+                        clickedSuggestionRef.current = null;
+                      } else if (quickHashtagInput.trim().length > 0) {
+                        handleQuickAddHashtag(quickHashtagInput);
+                      } else {
+                        setShowHashtagInput(false);
+                      }
+                      setHashtagSuggestions([]);
+                    }, 150);
+                  }}
+                  style={{
+                    borderRadius: '20px', padding: '0.3rem 0.8rem',
+                    border: '2px solid #DA486D', fontSize: '0.85rem',
+                    outline: 'none', width: '130px',
+                  }}
+                />
+
+                {/* Suggestions d'autocomplétion */}
+                {hashtagSuggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0,
+                    backgroundColor: 'white', borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    overflow: 'hidden', minWidth: '160px', zIndex: 100,
+                  }}>
+                    {hashtagSuggestions.map((s) => (
+                      <div
+                        key={s}
+                        onMouseDown={() => {
+                          clickedSuggestionRef.current = s;
+                        }}
+                        style={{
+                          padding: '0.5rem 1rem', fontSize: '0.9rem',
+                          cursor: 'pointer', color: '#222',
+                          borderBottom: '1px solid #eee',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E6F2FF')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                      >
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Liste des fichiers du chant */}
           {files.length === 0 ? (
@@ -275,6 +406,7 @@ export default function SongPage() {
                     type="button"
                     className="page-button2"
                     onClick={() => fileInputRef.current?.click()}
+                    style={{ marginTop: '1.5rem' }}
                   >
                     Choisir un fichier
                   </button>
@@ -297,7 +429,7 @@ export default function SongPage() {
                 <button
                   className="page-button pink"
                   onClick={() => navigate(`/edit-song/${song.id}`)}
-                  style={{ marginTop: '1.5rem' }}
+                  style={{ marginTop: '2.5rem' }}
                 >
                   <i className="fa fa-music"></i> &nbsp;
                   Modifier le chant
@@ -354,6 +486,7 @@ export default function SongPage() {
                     ref={audioRef}
                     controls
                     autoPlay
+                    loop
                     src={audioUrl}
                     style={{ flex: 1, height: '35px', minWidth: 0 }}
                   />
@@ -444,6 +577,7 @@ export default function SongPage() {
             ref={audioRef}
             controls
             autoPlay
+            loop
             src={audioUrl}
             style={{ width: '100%', height: '35px' }}
           />

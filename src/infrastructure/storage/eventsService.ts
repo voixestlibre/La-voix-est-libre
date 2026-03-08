@@ -52,11 +52,11 @@ export async function setEventSongs(eventId: string, songIds: string[]) {
     .eq('event_id', eventId);
   if (deleteError) throw deleteError;
 
-  // Insérer les nouvelles associations
+  // Insérer les nouvelles associations avec leur position
   if (songIds.length > 0) {
     const { error: insertError } = await supabase
       .from('event_songs')
-      .insert(songIds.map((song_id) => ({ event_id: eventId, song_id })));
+      .insert(songIds.map((song_id, index) => ({ event_id: eventId, song_id, position: index })));
     if (insertError) throw insertError;
   }
 }
@@ -75,30 +75,31 @@ export async function getChoirEvents(choirId: string) {
 
 
 // Récupérer les chants associés à un événement avec leurs détails
-// Récupérer les chants associés à un événement avec leurs détails
 export async function getEventSongsDetails(eventId: string) {
-  // Récupérer les song_id associés à l'événement
   const { data: links, error: linksError } = await supabase
     .from('event_songs')
-    .select('song_id')
-    .eq('event_id', eventId);
+    .select('song_id, position')
+    .eq('event_id', eventId)
+    .order('position');
   if (linksError) throw linksError;
   if (!links || links.length === 0) return [];
 
   const songIds = links.map((r) => r.song_id);
 
-  // Récupérer les détails des chants
   const { data: songs, error: songsError } = await supabase
     .from('songs')
     .select('id, title, hashtags')
-    .in('id', songIds)
-    .order('title');
+    .in('id', songIds);
   if (songsError) throw songsError;
 
-  return (songs || []).map((s) => ({
-    ...s,
-    hashtags: s.hashtags ? s.hashtags.split(',').filter(Boolean) : [],
-  }));
+  // Retrier selon l'ordre de position
+  return links.map((link) => {
+    const song = songs?.find((s) => s.id === link.song_id);
+    return {
+      ...song,
+      hashtags: song?.hashtags ? song.hashtags.split(',').filter(Boolean) : [],
+    };
+  });
 }
 
 // Supprimer un événement et ses liens avec les chants

@@ -90,7 +90,7 @@ export default function SongEditPage() {
     
     // Supprimer les accents et mettre la première lettre en majuscule
     const noAccent = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const capitalized = noAccent.charAt(0).toUpperCase() + noAccent.slice(1).toLowerCase();
+    const capitalized = noAccent.charAt(0).toUpperCase() + noAccent.slice(1);
     
     const tag = `#${capitalized}`;
     if (!hashtags.includes(tag)) {
@@ -115,6 +115,13 @@ export default function SongEditPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Si un hashtag est en cours de saisie, l'ajouter avant de soumettre
+    if (hashtagInput.trim().length > 0) {
+      addHashtag(hashtagInput);
+      return;
+    }    
+    
     setLoading(true);
     setMessage('');
     try {

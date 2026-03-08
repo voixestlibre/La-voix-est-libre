@@ -17,6 +17,7 @@ export default function ChoirPage() {
   const [loading, setLoading] = useState(true);
   // Onglet actif : 'events' ou 'songs'
   const [activeTab, setActiveTab] = useState<'events' | 'songs'>('songs');
+  const [groupByHashtag, setGroupByHashtag] = useState(false);
 
   useEffect(() => {
     const fetchChoir = async () => {
@@ -72,6 +73,20 @@ export default function ChoirPage() {
     fontSize: '1rem',
     cursor: 'pointer',
   } as React.CSSProperties);
+
+  // Construire la liste groupée par hashtags
+  const getGroupedSongs = () => {
+    const groups: { tag: string; songs: any[] }[] = [];
+    const allTags = Array.from(new Set(songs.flatMap((s) => s.hashtags || []))).sort();
+    for (const tag of allTags) {
+      groups.push({ tag, songs: songs.filter((s) => s.hashtags?.includes(tag)) });
+    }
+    const noTagSongs = songs.filter((s) => !s.hashtags || s.hashtags.length === 0);
+    if (noTagSongs.length > 0) {
+      groups.push({ tag: 'Sans hashtag', songs: noTagSongs });
+    }
+    return groups;
+  };
 
   return (
     <div className="page-container">
@@ -152,21 +167,45 @@ export default function ChoirPage() {
           {/* ── Onglet Chants ── */}
           {activeTab === 'songs' && (
             <>
+              {/* Toggle tri / regroupement */}
+              {songs.length > 0 && (
+                <div style={{ display: 'flex', marginBottom: '1rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.2rem' }}>
+                  <button
+                    onClick={() => setGroupByHashtag(false)}
+                    style={{
+                      flex: 1, padding: '0.4rem', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                      backgroundColor: !groupByHashtag ? '#044C8D' : 'transparent',
+                      color: !groupByHashtag ? 'white' : '#044C8D',
+                      fontSize: '0.85rem', fontWeight: !groupByHashtag ? 'bold' : 'normal',
+                    }}
+                  >
+                    <i className="fa fa-arrow-down-a-z"></i> &nbsp; Alphabétique
+                  </button>
+                  <button
+                    onClick={() => setGroupByHashtag(true)}
+                    style={{
+                      flex: 1, padding: '0.4rem', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                      backgroundColor: groupByHashtag ? '#044C8D' : 'transparent',
+                      color: groupByHashtag ? 'white' : '#044C8D',
+                      fontSize: '0.85rem', fontWeight: groupByHashtag ? 'bold' : 'normal',
+                    }}
+                  >
+                    <i className="fa fa-hashtag"></i> &nbsp; Par hashtag
+                  </button>
+                </div>
+              )}
+
               {songs.length === 0 ? (
                 <p>Aucun chant pour cette chorale.</p>
-              ) : (
+              ) : !groupByHashtag ? (
+                // ── Vue alphabétique ──
                 <ul className="list-music">
                   {songs.map((s) => (
                     <div key={s.id} className="card-music pink">
                       <i className="fa fa-music note"></i>
-                      <div
-                        className="text"
-                        onClick={() => navigate(`/song/${s.id}`)}
-                        style={{ cursor: 'pointer' }}
-                      >
+                      <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
                         <strong>{s.title}</strong>
-                        {/* Hashtags sous forme de pills */}
-                        {s.hashtags && s.hashtags.length > 0 && (
+                        {s.hashtags?.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
                             {s.hashtags.map((tag: string) => (
                               <span key={tag} className="hashtag-pill">{tag}</span>
@@ -174,37 +213,49 @@ export default function ChoirPage() {
                           </div>
                         )}
                       </div>
-                      {/* Icône suppression visible uniquement pour le propriétaire */}
                       {isOwner && (
-                        <i
-                          className="fa fa-trash trash"
-                          onClick={() => navigate(`/delete-song/${s.id}`)}
-                        ></i>
+                        <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
                       )}
                     </div>
                   ))}
                 </ul>
+              ) : (
+                // ── Vue par hashtag ──
+                <>
+                  {getGroupedSongs().map(({ tag, songs: groupSongs }) => (
+                    <div key={tag} style={{ marginBottom: '1.2rem' }}>
+                      <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.5rem 0' }}>
+                        {tag}
+                      </p>
+                      <ul className="list-music">
+                        {groupSongs.map((s) => (
+                          <div key={`${tag}-${s.id}`} className="card-music pink">
+                            <i className="fa fa-music note"></i>
+                            <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
+                              <strong>{s.title}</strong>
+                            </div>
+                            {isOwner && (
+                              <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
+                            )}
+                          </div>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </>
               )}
 
-              {/* Boutons ajout / import de chants (propriétaire uniquement) */}
+              {/* Boutons ajout / import (propriétaire uniquement) */}
               {isOwner && (
                 <>
                   <div>
-                    <button
-                      className="page-button"
-                      onClick={() => navigate(`/add-song/${choir.id}`)}
-                    >
-                      <i className="fa fa-music"></i> &nbsp;
-                      Ajouter un chant
+                    <button className="page-button" onClick={() => navigate(`/add-song/${choir.id}`)}>
+                      <i className="fa fa-music"></i> &nbsp; Ajouter un chant
                     </button>
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
-                    <button
-                      className="page-button"
-                      onClick={() => navigate(`/import-songs/${choir.id}`)}
-                    >
-                      <i className="fa fa-folder-open"></i> &nbsp;
-                      Importer des chants
+                    <button className="page-button" onClick={() => navigate(`/import-songs/${choir.id}`)}>
+                      <i className="fa fa-folder-open"></i> &nbsp; Importer des chants
                     </button>
                   </div>
                 </>
