@@ -9,6 +9,7 @@ import ChoirJoinPage from './ui/pages/ChoirJoinPage';
 import SongEditPage from './ui/pages/SongEditPage';
 import SongPage from './ui/pages/SongPage';
 import SongDeletePage from './ui/pages/SongDeletePage';
+import SongsImportPage from './ui/pages/SongsImportPage';
 import LoginPage from './ui/pages/LoginPage';
 import ResetRequestPage from './ui/pages/ResetRequestPage';
 import ResetPasswordPage from './ui/pages/ResetPasswordPage';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/edit-song/:songId" element={<SongEditPage />} />  
         <Route path="/song/:songId" element={<SongPage />} />  
         <Route path="/delete-song/:id" element={<SongDeletePage />} />  
+        <Route path="/import-songs/:choirId" element={<SongsImportPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-request" element={<ResetRequestPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

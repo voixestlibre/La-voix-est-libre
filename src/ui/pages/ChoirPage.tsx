@@ -50,12 +50,20 @@ export default function ChoirPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">←</Link>
-        {user && <Link to="/login" className="navigation">⎋</Link>}
+        <Link to="/my-choirs" className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        {/* Lien déconnexion visible uniquement si connecté */}
+        {user && <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+          </Link>}
       </div>
       {loading ? ( <div className="spinner"></div> ) : (
         <>
-          <h2>{choir.name}</h2>
+          <h2>
+            <i className="fa fa-users" style={{ color: '#FB8917', marginRight: '0.5rem' }}></i>
+            {choir.name}
+          </h2>
           <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
 
           {/* Liste des chants */}
@@ -103,6 +111,16 @@ export default function ChoirPage() {
                 >
                   <i className="fa fa-music"></i> &nbsp;
                   Ajouter un chant
+                </button>
+              </div>
+              <div>
+                <button
+                  className="page-button"
+                  onClick={() => navigate(`/import-songs/${choir.id}`)}
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  <i className="fa fa-music"></i> &nbsp;
+                  Importer des chants
                 </button>
               </div>
               <div>

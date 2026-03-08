@@ -136,8 +136,12 @@ export default function SongEditPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to={backUrl} className="navigation">←</Link>
-        <Link to="/login" className="navigation">⎋</Link>
+        <Link to={backUrl} className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+        </Link>        
       </div>
 
       <h2>{isEditing ? 'Modifier un chant' : 'Ajouter un chant'}</h2>

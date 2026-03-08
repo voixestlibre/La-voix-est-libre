@@ -37,8 +37,11 @@ export default function SongPage() {
   const [audioName, setAudioName] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Sélection des musiques
+  // Menu déroulant sélection audio
   const [showAudioSelect, setShowAudioSelect] = useState(false);
+
+  // PDF ouvert sans audio sélectionné, mais des audios sont disponibles
+  const [pdfAudioReady, setPdfAudioReady] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,7 +79,15 @@ export default function SongPage() {
     };
   }, [songId, navigate]);
 
-  // Lister les fichiers du dossier songId dans le bucket
+  // Lancer automatiquement la lecture quand l'audio change
+  useEffect(() => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.load();
+      audioRef.current.play().catch(() => {});
+    }
+  }, [audioUrl]);  
+
+  // Lister les fichiers triés : PDF en premier, puis audio, ordre alphabétique dans chaque groupe
   const fetchFiles = async () => {
     const data = await getSongFiles(songId!);
     const sorted = [...data].sort((a, b) => {
@@ -84,11 +95,7 @@ export default function SongPage() {
       const extB = b.name.split('.').pop()?.toLowerCase() || '';
       const isAudioA = ['mp3', 'wav', 'ogg', 'm4a'].includes(extA);
       const isAudioB = ['mp3', 'wav', 'ogg', 'm4a'].includes(extB);
-  
-      // PDF avant audio
       if (isAudioA !== isAudioB) return isAudioA ? 1 : -1;
-  
-      // Ordre alphabétique sur le nom sans extension
       const nameA = a.name.split('.').slice(0, -1).join('.');
       const nameB = b.name.split('.').slice(0, -1).join('.');
       return nameA.localeCompare(nameB);
@@ -114,23 +121,21 @@ export default function SongPage() {
     setMessage('');
 
     try {
-      // Construire le nom final : label saisi + extension du fichier original
-      // Ex : label="Ténor 2", fichier="tenor.mp3" → "Tenor 2.mp3"
+      // Construire le nom final : label sans accents + extension du fichier original
       const ext = file.name.split('.').pop();
       const cleanLabel = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const finalName = `${cleanLabel}.${ext}`;
 
-      // Vérifier si un fichier avec le même nom existe déjà dans le bucket
+      // Vérifier si un fichier avec le même nom existe déjà
       if (await fileExists(songId!, finalName)) {
         setMessage(`Un fichier "${finalName}" existe déjà pour ce chant.`);
         setUploading(false);
         return;
       }
 
-      // Upload du fichier dans le bucket
       await uploadSongFile(songId!, finalName, file);
 
-      // Réinitialiser le formulaire (y compris l'input file via sa ref)
+      // Réinitialiser le formulaire
       setLabel('');
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -175,26 +180,38 @@ export default function SongPage() {
   const handleFileClick = (fileName: string) => {
     const url = getPublicUrl(fileName);
     if (isPdf(fileName)) {
-      // Ouvrir le PDF en plein écran
       setPdfUrl(url);
+      // Si pas d'audio en cours mais qu'il y en a de disponibles, préparer le bouton note
+      if (!audioUrl && files.some((f) => isAudio(f.name))) {
+        setPdfAudioReady(true);
+      }
     } else if (isAudio(fileName)) {
-      // Lancer la lecture audio dans le popup flottant
       setAudioUrl(url);
       setAudioName(fileName.split('.').slice(0, -1).join('.'));
+      setPdfAudioReady(false);
     }
   };
 
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to={`/choir/${song?.choir_id}`} className="navigation">←</Link>
-        {user && <Link to="/login" className="navigation">⎋</Link>}
+        <Link to={`/choir/${song?.choir_id}`} className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        {user && (
+          <Link to="/login" className="navigation">
+            <i className="fa fa-right-from-bracket"></i>
+          </Link>
+        )}
       </div>
 
       {loading ? <div className="spinner"></div> : (
         <>
-          <h2>{song.title}</h2>
-
+          <h2>
+            <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
+            {song.title}
+          </h2>
+          {/* Hashtags du chant */}
           {song.hashtags?.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0' }}>
               {song.hashtags.map((tag: string) => (
@@ -210,7 +227,6 @@ export default function SongPage() {
             <ul className="list-music">
               {files.map((f) => (
                 <div key={f.name} className="card-music">
-                  {/* Icône selon le type de fichier */}
                   <i
                     className={`fa ${getIcon(f.name)} note`}
                     onClick={() => handleFileClick(f.name)}
@@ -223,7 +239,6 @@ export default function SongPage() {
                   >
                     <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
                   </div>
-                  {/* Icône suppression visible uniquement pour le propriétaire */}
                   {isOwner && (
                     <i
                       className="fa fa-trash trash"
@@ -248,7 +263,7 @@ export default function SongPage() {
                     onChange={(e) => {
                       const selected = e.target.files?.[0] || null;
                       setFile(selected);
-                      // Préremplir le label avec le nom du fichier sans extension, si label vide
+                      // Préremplir le label avec le nom du fichier sans extension si label vide
                       if (selected && !label) {
                         const nameWithoutExt = selected.name.split('.').slice(0, -1).join('.');
                         setLabel(nameWithoutExt);
@@ -256,7 +271,6 @@ export default function SongPage() {
                     }}
                     style={{ display: 'none' }}
                   />
-                  {/* Bouton stylisé qui déclenche l'input file */}
                   <button
                     type="button"
                     className="page-button2"
@@ -266,7 +280,6 @@ export default function SongPage() {
                   </button>
                   {file && <p style={{ marginTop: '0.3rem', fontSize: '0.9rem', color: '#555' }}>{file.name}</p>}
                 </div>
-                {/* Nom personnalisé qui deviendra le nom du fichier stocké */}
                 <input
                   type="text"
                   placeholder="Nom du fichier"
@@ -279,13 +292,14 @@ export default function SongPage() {
                   {uploading ? 'Envoi...' : 'Ajouter'}
                 </button>
               </form>
+
               <div>
                 <button
                   className="page-button pink"
                   onClick={() => navigate(`/edit-song/${song.id}`)}
                   style={{ marginTop: '1.5rem' }}
                 >
-                  <i className="fa fa-music"></i> &nbsp; 
+                  <i className="fa fa-music"></i> &nbsp;
                   Modifier le chant
                 </button>
               </div>
@@ -295,7 +309,7 @@ export default function SongPage() {
                   onClick={() => navigate(`/delete-song/${song.id}`)}
                   style={{ marginTop: '1.5rem' }}
                 >
-                  <i className="fa fa-music"></i> &nbsp; 
+                  <i className="fa fa-music"></i> &nbsp;
                   Supprimer le chant
                 </button>
               </div>
@@ -315,13 +329,13 @@ export default function SongPage() {
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
         }}>
-          {/* Barre du haut : fermer + lecteur audio si actif */}
+          {/* Barre du haut : bouton fermer + lecteur audio si actif ou disponible */}
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '0.5rem', gap: '0.5rem',
           }}>
             <button
-              onClick={() => setPdfUrl(null)}
+              onClick={() => { setPdfUrl(null); setPdfAudioReady(false); setAudioUrl(null); setAudioName(''); }}
               style={{
                 padding: '0.4rem 0.8rem', fontSize: '1rem',
                 background: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer',
@@ -331,17 +345,26 @@ export default function SongPage() {
               ✕ Fermer
             </button>
 
-            {audioUrl && (
+            {/* Lecteur audio : affiché si un audio est en cours OU si des audios sont disponibles */}
+            {(audioUrl || pdfAudioReady) && (
               <>
-                <audio
-                  ref={audioRef}
-                  controls
-                  autoPlay
-                  src={audioUrl}
-                  style={{ flex: 1, height: '35px', minWidth: 0 }}
-                />
+                {audioUrl ? (
+                  // Lecteur audio actif
+                  <audio
+                    ref={audioRef}
+                    controls
+                    autoPlay
+                    src={audioUrl}
+                    style={{ flex: 1, height: '35px', minWidth: 0 }}
+                  />
+                ) : (
+                  // Invitation à sélectionner un audio
+                  <span style={{ flex: 1, color: 'white', fontSize: '0.9rem', paddingLeft: '0.5rem' }}>
+                    Sélectionnez un audio ↓
+                  </span>
+                )}
 
-                {/* Bouton note qui ouvre/ferme le menu déroulant */}
+                {/* Bouton note → menu déroulant sélection audio */}
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button
                     onClick={() => setShowAudioSelect(!showAudioSelect)}
@@ -355,7 +378,7 @@ export default function SongPage() {
                     <i className="fa fa-music"></i>
                   </button>
 
-                  {/* Menu déroulant liste des fichiers audio */}
+                  {/* Liste des fichiers audio disponibles */}
                   {showAudioSelect && (
                     <div style={{
                       position: 'absolute', top: '40px', right: 0,
@@ -369,6 +392,7 @@ export default function SongPage() {
                           onClick={() => {
                             setAudioUrl(getPublicUrl(f.name));
                             setAudioName(f.name.split('.').slice(0, -1).join('.'));
+                            setPdfAudioReady(false);
                             setShowAudioSelect(false);
                           }}
                           style={{
@@ -389,7 +413,7 @@ export default function SongPage() {
             )}
           </div>
 
-          {/* PDF avec paramètres pour masquer toolbar et panneau latéral sur mobile */}
+          {/* Iframe PDF */}
           <iframe
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
             style={{ flex: 1, border: 'none', width: '100%', display: 'block' }}
@@ -425,7 +449,6 @@ export default function SongPage() {
           />
         </div>
       )}
-
     </div>
   );
 }

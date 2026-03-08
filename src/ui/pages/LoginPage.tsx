@@ -40,7 +40,7 @@ export default function LoginPage() {
         navigate('/reset-request'); 
       } else {
         setUser({ email: result.email!, isAdmin: result.isAdmin });
-        navigate('/my-choirs'); 
+        navigate('/'); 
       }
     } catch (err: any) {
       setMessage(translateSupabaseError(err.message));
@@ -57,7 +57,9 @@ export default function LoginPage() {
 
   return (
     <div className="page-container">
-      <Link to="/" className="navigation">←</Link>
+      <Link to="/" className="navigation">
+        <i className="fa fa-chevron-left"></i>
+      </Link>
 
       {user ? (
         <>

@@ -111,9 +111,13 @@ export default function MyChoirsPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/" className="navigation">←</Link>
+        <Link to="/" className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
         {/* Lien déconnexion visible uniquement si connecté */}
-        {user && <Link to="/login" className="navigation">⎋</Link>}
+        {user && <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+          </Link>}
       </div>
       <h2>Mes chorales</h2>
 
