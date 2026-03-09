@@ -42,10 +42,12 @@ export default function RequestResetPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/login" className="navigation">←</Link>
-        {user && (
-          <Link to="/login" className="navigation">⎋</Link>
-        )}
+        <Link to="/login" className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        {user && <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+          </Link>}
       </div>
       <h2>Réinitialiser le mot de passe</h2>
       {!message && (

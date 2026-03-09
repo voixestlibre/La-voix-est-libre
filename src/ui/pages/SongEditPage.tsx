@@ -90,7 +90,7 @@ export default function SongEditPage() {
     
     // Supprimer les accents et mettre la première lettre en majuscule
     const noAccent = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const capitalized = noAccent.charAt(0).toUpperCase() + noAccent.slice(1).toLowerCase();
+    const capitalized = noAccent.charAt(0).toUpperCase() + noAccent.slice(1);
     
     const tag = `#${capitalized}`;
     if (!hashtags.includes(tag)) {
@@ -115,6 +115,13 @@ export default function SongEditPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Si un hashtag est en cours de saisie, l'ajouter avant de soumettre
+    if (hashtagInput.trim().length > 0) {
+      addHashtag(hashtagInput);
+      return;
+    }    
+    
     setLoading(true);
     setMessage('');
     try {
@@ -136,8 +143,12 @@ export default function SongEditPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to={backUrl} className="navigation">←</Link>
-        <Link to="/login" className="navigation">⎋</Link>
+        <Link to={backUrl} className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+        </Link>        
       </div>
 
       <h2>{isEditing ? 'Modifier un chant' : 'Ajouter un chant'}</h2>

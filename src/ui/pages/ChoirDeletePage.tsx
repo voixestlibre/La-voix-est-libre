@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir, deleteChoir } from '../../infrastructure/storage/choirsService';
 import { countChoirSongs, getChoirSongIds, deleteSong } from '../../infrastructure/storage/songsService';
+import { getChoirEventIds, deleteEvent } from '../../infrastructure/storage/eventsService';
 import '../../App.css';
 
 export default function DeleteChoirPage() {
@@ -45,6 +46,11 @@ export default function DeleteChoirPage() {
         await deleteSong(songId);
       }
 
+      // Supprimer tous les événements et leurs liens avec les chants
+      const eventIds = await getChoirEventIds(id!);
+      for (const eventId of eventIds) {
+        await deleteEvent(eventId);
+      }
       // Supprimer la chorale
       await deleteChoir(id!);
       navigate('/my-choirs');
@@ -64,8 +70,12 @@ export default function DeleteChoirPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">←</Link>
-        <Link to="/login" className="navigation">⎋</Link>
+        <Link to="/my-choirs" className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+        </Link>
       </div>
       <h2>Supprimer une chorale</h2>
       <p>{confirmMessage}</p>

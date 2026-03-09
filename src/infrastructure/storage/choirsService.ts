@@ -1,26 +1,18 @@
 // infrastructure/choirsService.ts
 import { supabase } from './supabaseClient';
 
-/**
- * Génère un code unique pour la chorale
- */
-async function generateUniqueCode(): Promise<number> {
-  let code: number = 0;
+// Générer un code à 8 chiffres unique dans les tables choirs ET events
+export async function generateUniqueCode(): Promise<string> {
+  let code: string;
   let exists = true;
-
-  while (exists) {
-    code = Math.floor(Math.random() * (99999999 - 10000000 + 1)) + 10000000;
-
-    const { data, error } = await supabase
-      .from('choirs')
-      .select('code')
-      .eq('code', code)
-      .limit(1);
-
-    if (error) throw error;
-
-    exists = data && data.length > 0;
-  }
+  do {
+    code = Math.floor(10000000 + Math.random() * 90000000).toString();
+    const [{ data: choir }, { data: event }] = await Promise.all([
+      supabase.from('choirs').select('id').eq('code', code).single(),
+      supabase.from('events').select('id').eq('code', code).single(),
+    ]);
+    exists = !!choir || !!event;
+  } while (exists);
   return code;
 }
 

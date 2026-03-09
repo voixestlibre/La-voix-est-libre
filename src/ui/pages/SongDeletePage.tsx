@@ -45,8 +45,12 @@ export default function DeleteSongPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to={`/song/${songId}`} className="navigation">←</Link>
-        <Link to="/login" className="navigation">⎋</Link>
+        <Link to={`/song/${songId}`} className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+        </Link>
       </div>
       <h2>Supprimer un chant</h2>
       <p>Êtes-vous sûr de vouloir supprimer le chant <strong>{songTitle}</strong> (ainsi que tous les fichiers qui lui sont rattachés) ?</p>

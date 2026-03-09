@@ -145,3 +145,16 @@ export async function countChoirSongs(choirId: string) {
   if (error) throw error;
   return count ?? 0;
 }
+
+
+// Vérifier si un chant avec ce titre existe déjà dans la chorale
+export async function songTitleExists(choirId: string, title: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('songs')
+    .select('id')
+    .eq('choir_id', choirId)
+    .eq('title', title)
+    .single();
+  if (error) return false;
+  return !!data;
+}

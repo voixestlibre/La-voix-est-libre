@@ -66,8 +66,12 @@ export default function ChoirJoinPage() {
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">←</Link>
-        {user && <Link to="/login" className="navigation">⎋</Link>}
+        <Link to="/my-choirs" className="navigation">
+          <i className="fa fa-chevron-left"></i>
+        </Link>
+        {user && <Link to="/login" className="navigation">
+          <i className="fa fa-right-from-bracket"></i>
+          </Link>}
       </div>
 
       <h2>Rejoindre une chorale</h2>
