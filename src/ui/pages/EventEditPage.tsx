@@ -4,6 +4,7 @@ import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs } from '../../infrastructure/storage/songsService';
 import { getEvent, createEvent, updateEvent, getEventSongs, setEventSongs } from '../../infrastructure/storage/eventsService';
+import { getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function EventEditPage() {
@@ -109,24 +110,46 @@ export default function EventEditPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage('');
-
+  
     const eventDate = buildDate();
     if (!eventDate) {
       setMessage('Veuillez saisir une date valide (jj mm aaaa).');
       return;
     }
-
+  
     setLoading(true);
     try {
       if (isEditing) {
-        // Mettre à jour l'événement et ses chants associés
+        // Mettre à jour l'événement en base
         await updateEvent(eventId!, name, eventDate);
         await setEventSongs(eventId!, selectedSongIds);
+  
+        // Mettre à jour le nom dans joined_events si l'événement y est présent
+        // (le nom peut avoir changé)
+        const stored = getStoredEvents();
+        const updated = stored.map((e) =>
+          String(e.id) === String(eventId) ? { ...e, name } : e
+        );
+        setStoredEvents(updated);
+  
         navigate(`/event/${eventId}`);
       } else {
-        // Créer l'événement et associer les chants sélectionnés
+        // Créer l'événement en base
         const data = await createEvent(resolvedChoirId, name, eventDate);
         await setEventSongs(String(data.id), selectedSongIds);
+  
+        // Stocker le nouvel événement dans joined_events
+        // avec les infos de la chorale pour permettre l'accès offline
+        // et la construction des chorales fantômes dans MyChoirsPage
+        const stored = getStoredEvents();
+        setStoredEvents([...stored, {
+          id: data.id,
+          code: String(data.code),
+          name: data.name,
+          choir_id: data.choir_id,
+          choir_name: null, // sera renseigné au prochain passage sur MyChoirsPage
+        }]);
+  
         navigate(`/event/${data.id}`);
       }
     } catch (err: any) {

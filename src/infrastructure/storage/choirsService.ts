@@ -8,8 +8,8 @@ export async function generateUniqueCode(): Promise<string> {
   do {
     code = Math.floor(10000000 + Math.random() * 90000000).toString();
     const [{ data: choir }, { data: event }] = await Promise.all([
-      supabase.from('choirs').select('id').eq('code', code).single(),
-      supabase.from('events').select('id').eq('code', code).single(),
+      supabase.from('choirs').select('id').eq('code', code).maybeSingle(),
+      supabase.from('events').select('id').eq('code', code).maybeSingle(),
     ]);
     exists = !!choir || !!event;
   } while (exists);
@@ -60,7 +60,7 @@ export async function getChoirByCode(code: string) {
     .from('choirs')
     .select('id, code, name')
     .eq('code', code)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, deleteEvent } from '../../infrastructure/storage/eventsService';
+import { removeStoredEvent } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function EventDeletePage() {
@@ -36,8 +37,13 @@ export default function EventDeletePage() {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      // Supprimer l'événement et ses liens avec les chants
+      // Supprimer l'événement en base et ses liens avec les chants
       await deleteEvent(eventId!);
+  
+      // Supprimer l'événement du localStorage
+      // (pour tous les utilisateurs qui l'auraient rejoint)
+      removeStoredEvent(eventId!);
+  
       navigate(`/choir/${event.choir_id}`);
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);

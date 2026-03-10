@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirByCode } from '../../infrastructure/storage/choirsService';
+import { getEventByCode, getEventsByChoirIds } from '../../infrastructure/storage/eventsService';
+import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function ChoirJoinPage() {
@@ -35,7 +37,7 @@ export default function ChoirJoinPage() {
     }
   };
 
-  // Recherche de la chorale par son code et redirection
+  // Recherche de la chorale ou de l'événement par son code et redirection
   const handleJoin = async () => {
     const code = groups.join('');
     if (code.length < 8) {
@@ -46,32 +48,83 @@ export default function ChoirJoinPage() {
     setError('');
 
     try {
-      const data = await getChoirByCode(code);
+      // ── Essayer d'abord comme code de chorale ──────────────────────
+      try {
+        const data = await getChoirByCode(code);
 
-      // Stocker la chorale dans le localStorage si pas déjà présente
-      const existing = JSON.parse(localStorage.getItem('joined_choirs') || '[]');
-      if (!existing.find((c: any) => c.code === data.code)) {
-        existing.push({ code: data.code, name: data.name });
-        localStorage.setItem('joined_choirs', JSON.stringify(existing));
-      }
+        // Ajouter la chorale dans joined_choirs si pas déjà présente
+        const storedChoirs = getStoredChoirs();
+        if (!storedChoirs.find((c) => String(c.code) === String(data.code))) {
+          setStoredChoirs([...storedChoirs, { code: String(data.code), name: data.name, id: data.id }]);
+        }
 
-      navigate(`/choir/${data.id}`);
-    } catch {
+        // Stocker immédiatement tous les événements de cette chorale dans joined_events
+        // pour qu'ils soient accessibles offline dès le premier accès
+        try {
+          const eventsData = await getEventsByChoirIds([String(data.id)]);
+          const storedEvents = getStoredEvents();
+          const updatedEvents = [...storedEvents];
+          eventsData.forEach((ev: any) => {
+            // Ajouter uniquement les événements pas encore présents
+            if (!updatedEvents.find((e) => String(e.code) === String(ev.code))) {
+              updatedEvents.push({
+                code: String(ev.code),
+                name: ev.name,
+                id: ev.id,
+                choir_id: ev.choir_id,
+                choir_name: data.name,
+              });
+            }
+          });
+          setStoredEvents(updatedEvents);
+        } catch {}
+        // Erreur silencieuse : les événements seront synchronisés
+        // au prochain passage sur MyChoirsPage
+
+        navigate(`/choir/${data.id}`);
+        return;
+      } catch {}
+
+      // ── Sinon essayer comme code d'événement ───────────────────────
+      try {
+        const data = await getEventByCode(code);
+
+        // Ajouter l'événement dans joined_events si pas déjà présent
+        const storedEvents = getStoredEvents();
+        if (!storedEvents.find((e) => String(e.code) === String(data.code))) {
+          setStoredEvents([...storedEvents, {
+            code: String(data.code),
+            name: data.name,
+            id: data.id,
+            choir_id: data.choir_id,
+            // choir_code volontairement omis : l'utilisateur ne doit pas
+            // pouvoir découvrir le code de la chorale via les DevTools
+            choir_name: data.choir ? data.choir.name : null,
+          }]);
+        }
+
+        navigate(`/event/${data.id}`);
+        return;
+      } catch {}
+
+      // Aucun résultat trouvé ni comme chorale ni comme événement
       setError('Code invalide...');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
     <div className="page-container">
       <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">
+        <Link to="/" className="navigation">
           <i className="fa fa-chevron-left"></i>
         </Link>
-        {user && <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-          </Link>}
+        {user && (
+          <Link to="/login" className="navigation">
+            <i className="fa fa-right-from-bracket"></i>
+          </Link>
+        )}
       </div>
 
       <h2>Rejoindre une chorale</h2>
@@ -87,7 +140,15 @@ export default function ChoirJoinPage() {
               maxLength={2}
               value={g}
               onChange={(e) => handleChange(index, e.target.value)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
+
+              onKeyDown={(e) => {
+                handleKeyDown(index, e);
+                // Valider avec Enter si le code est complet (8 chiffres)
+                if (e.key === 'Enter' && groups.join('').length === 8) {
+                  handleJoin();
+                }
+              }}
+
               style={{
                 width: '3rem', height: '2.5rem',
                 textAlign: 'center', fontSize: '1.2rem',
@@ -107,7 +168,7 @@ export default function ChoirJoinPage() {
         </button>
       </div>
       <div>
-        <button className="page-button2" onClick={() => navigate('/my-choirs')}>
+        <button className="page-button2" onClick={() => navigate('/')}>
           Annuler
         </button>
       </div>

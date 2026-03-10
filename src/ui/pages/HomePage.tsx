@@ -29,12 +29,20 @@ export default function HomePage() {
 
       {/* Boutons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-        <button
+      <button
           className="page-button"
           style={{ width: '270px' }}
           onClick={() => navigate('/my-choirs')}
         >
           Mes chorales
+        </button>
+
+        <button
+          className="page-button"
+          style={{ width: '270px' }}
+          onClick={() => navigate('/join-choir')}
+        >
+          Rejoindre une chorale
         </button>
 
         <button

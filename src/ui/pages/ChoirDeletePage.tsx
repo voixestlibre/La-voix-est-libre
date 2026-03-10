@@ -4,6 +4,7 @@ import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir, deleteChoir } from '../../infrastructure/storage/choirsService';
 import { countChoirSongs, getChoirSongIds, deleteSong } from '../../infrastructure/storage/songsService';
 import { getChoirEventIds, deleteEvent } from '../../infrastructure/storage/eventsService';
+import { removeStoredChoir, removeStoredEventsByChoirId } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function DeleteChoirPage() {
@@ -51,6 +52,11 @@ export default function DeleteChoirPage() {
       for (const eventId of eventIds) {
         await deleteEvent(eventId);
       }
+
+      // Nettoyer le localStorage : supprimer la chorale et ses événements
+      removeStoredChoir(id!);
+      removeStoredEventsByChoirId(id!);
+
       // Supprimer la chorale
       await deleteChoir(id!);
       navigate('/my-choirs');

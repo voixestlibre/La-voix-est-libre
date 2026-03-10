@@ -4,6 +4,7 @@ import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs } from '../../infrastructure/storage/songsService';
 import { getChoirEvents } from '../../infrastructure/storage/eventsService';
+import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function ChoirPage() {
@@ -11,12 +12,14 @@ export default function ChoirPage() {
   const navigate = useNavigate();
   const [choir, setChoir] = useState<any>(null);
   const [isOwner, setIsOwner] = useState(false);
+  // Vrai si l'utilisateur a rejoint la chorale explicitement (via son code)
+  // Faux si l'utilisateur n'a accès qu'à certains événements (chorale "fantôme")
+  const [isFullMember, setIsFullMember] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [songs, setSongs] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  // Onglet actif : 'events' ou 'songs'
-  const [activeTab, setActiveTab] = useState<'events' | 'songs'>('songs');
+  const [activeTab, setActiveTab] = useState<'events' | 'songs'>('events');
   const [groupByHashtag, setGroupByHashtag] = useState(false);
 
   useEffect(() => {
@@ -25,26 +28,98 @@ export default function ChoirPage() {
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
 
+      // ── Vérifier les droits d'accès depuis le localStorage ───────────
+      // joined_choirs : chorales rejointes explicitement (code connu)
+      const joinedChoirs = getStoredChoirs();
+      // joined_events : événements rejoints (directement ou via une chorale)
+      const joinedEvents = getStoredEvents();
+
+      // Vérifier si la chorale est dans joined_choirs (membre explicite)
+      const isInJoinedChoirs = joinedChoirs.some((c: any) => String(c.id) === String(id));
+
+      // Vérifier si l'utilisateur a au moins un événement de cette chorale
+      const hasDirectEvent = joinedEvents.some((e: any) => String(e.choir_id) === String(id));
+
+      // Récupérer les codes d'événements auxquels l'utilisateur a accès pour cette chorale
+      // (utilisé plus bas pour filtrer les événements affichés)
+      const allowedEventCodes = joinedEvents
+        .filter((e: any) => String(e.choir_id) === String(id))
+        .map((e: any) => String(e.code));
+
       try {
-        // Récupérer la chorale
+        // Récupérer la chorale depuis Supabase
         const data = await getChoir(id!);
         setChoir(data);
 
         // Vérifier si l'utilisateur connecté est le propriétaire
-        if (currentUser && data.owner_id === currentUser.id) {
-          setIsOwner(true);
+        const ownerCheck = currentUser && data.owner_id === currentUser.id;
+        setIsOwner(!!ownerCheck);
+        if (ownerCheck) setActiveTab('songs');
+
+        // Un membre explicite = propriétaire OU chorale dans joined_choirs
+        const fullMember = !!ownerCheck || isInJoinedChoirs;
+        setIsFullMember(fullMember);
+
+        // Vérifier les droits d'accès :
+        // - propriétaire → accès total
+        // - membre explicite → accès total
+        // - événement direct → accès limité aux événements concernés
+        // - aucun des trois → redirection
+        if (!ownerCheck && !isInJoinedChoirs && !hasDirectEvent) {
+          navigate('/');
+          return;
         }
 
-        // Récupérer les chants et les événements en parallèle
+        // Récupérer les chants (propriétaire uniquement) et les événements en parallèle
         const [songsData, eventsData] = await Promise.all([
-          getChoirSongs(id!),
+          ownerCheck ? getChoirSongs(id!) : Promise.resolve([]),
           getChoirEvents(id!),
         ]);
         setSongs(songsData);
-        setEvents(eventsData);
+
+        // Filtrer les événements selon les droits :
+        // - propriétaire ou membre explicite → tous les événements
+        // - accès via événement direct uniquement → uniquement les événements autorisés
+        if (fullMember) {
+          setEvents(eventsData);
+        } else {
+          setEvents(eventsData.filter((ev: any) => allowedEventCodes.includes(String(ev.code))));
+        }
+
       } catch {
-        navigate('/');
-        return;
+        // ── Fallback offline ─────────────────────────────────────────────
+        // Supabase inaccessible : on reconstruit ce qu'on peut depuis le localStorage
+
+        // Vérifier les droits d'accès offline
+        if (!isInJoinedChoirs && !hasDirectEvent) {
+          // Pas de droits connus → redirection
+          navigate('/');
+          return;
+        }
+
+        // Reconstituer la chorale depuis le localStorage
+        const choirFromStorage = joinedChoirs.find((c: any) => String(c.id) === String(id));
+        if (choirFromStorage) {
+          setChoir({ id: choirFromStorage.id, name: choirFromStorage.name, code: choirFromStorage.code });
+          setIsFullMember(true);
+        } else {
+          // Chorale fantôme : on récupère le nom depuis joined_events
+          const eventWithChoir = joinedEvents.find((e: any) => String(e.choir_id) === String(id));
+          if (eventWithChoir) {
+            setChoir({ id, name: eventWithChoir.choir_name, code: null });
+          }
+          setIsFullMember(false);
+        }
+
+        // Reconstituer les événements depuis le localStorage
+        // On affiche uniquement les événements auxquels l'utilisateur a accès
+        const offlineEvents = joinedEvents
+          .filter((e: any) => String(e.choir_id) === String(id))
+          .map((e: any) => ({ id: e.id, name: e.name, code: e.code }));
+        setEvents(offlineEvents);
+
+        // Pas de chants accessibles offline (les fichiers ne sont pas en cache)
+        setSongs([]);
       }
 
       setLoading(false);
@@ -54,12 +129,6 @@ export default function ChoirPage() {
 
   // Formater le code en groupes de 2 chiffres séparés par des tirets
   const formatCode = (code: string) => code.match(/.{1,2}/g)?.join('-') ?? code;
-
-  // Formater une date ISO en jj/mm/aaaa
-  const formatDate = (isoDate: string) => {
-    const d = new Date(isoDate);
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-  };
 
   // Style d'un onglet selon qu'il est actif ou non
   const tabStyle = (tab: 'events' | 'songs') => ({
@@ -74,7 +143,7 @@ export default function ChoirPage() {
     cursor: 'pointer',
   } as React.CSSProperties);
 
-  // Construire la liste groupée par hashtags
+  // Construire la liste des chants groupés par hashtags
   const getGroupedSongs = () => {
     const groups: { tag: string; songs: any[] }[] = [];
     const allTags = Array.from(new Set(songs.flatMap((s) => s.hashtags || []))).sort();
@@ -107,13 +176,21 @@ export default function ChoirPage() {
             <i className="fa fa-users" style={{ color: '#FB8917', marginRight: '0.5rem' }}></i>
             {choir.name}
           </h2>
-          <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
 
-          {/* Onglets */}
+          {/* Code de la chorale : masqué pour les membres "fantômes"
+              (accès via événement direct uniquement) pour éviter qu'ils
+              ne rejoignent la chorale et accèdent à tous ses événements */}
+          {isFullMember && choir.code && (
+            <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
+          )}
+
+          {/* Onglets : l'onglet Chants n'est visible que pour le propriétaire */}
           <div style={{ display: 'flex', marginBottom: '1.5rem', borderBottom: '3px solid #ddd' }}>
-            <button style={tabStyle('songs')} onClick={() => setActiveTab('songs')}>
-              <i className="fa fa-music"></i> &nbsp; Chants
-            </button>
+            {isOwner && (
+              <button style={tabStyle('songs')} onClick={() => setActiveTab('songs')}>
+                <i className="fa fa-music"></i> &nbsp; Chants
+              </button>
+            )}
             <button style={tabStyle('events')} onClick={() => setActiveTab('events')}>
               <i className="fa fa-calendar-days"></i> &nbsp; Evénements
             </button>
@@ -135,15 +212,27 @@ export default function ChoirPage() {
                         style={{ cursor: 'pointer' }}
                       >
                         <strong>{ev.name}</strong>
-                        <span>Code : {formatCode(ev.code)}</span>
+                        {/* Le code de l'événement est toujours affiché :
+                            l'utilisateur en a besoin pour le partager */}
+                        <span>Code : {formatCode(String(ev.code))}</span>
                       </div>
-                      {/* Icône suppression visible uniquement pour le propriétaire */}
-                      {isOwner && (
+
+                      {/* Icône quitter : uniquement si l'événement a été rejoint directement
+                          (pas via la chorale) — les membres explicites ne peuvent pas quitter
+                          un événement individuellement */}
+                      {isOwner ? (
                         <i
                           className="fa fa-trash trash"
                           onClick={() => navigate(`/delete-event/${ev.id}`)}
                         ></i>
-                      )}
+                      ) : !isFullMember ? (
+                        // Membre fantôme : a rejoint l'événement directement → peut le quitter
+                        <i
+                          className="fa fa-sign-out trash"
+                          onClick={() => navigate(`/leave-event/${ev.id}`)}
+                        ></i>
+                      ) : null /* Membre explicite : voit tous les events via la chorale → pas d'icône quitter */}
+
                     </div>
                   ))}
                 </ul>
@@ -164,10 +253,9 @@ export default function ChoirPage() {
             </>
           )}
 
-          {/* ── Onglet Chants ── */}
+          {/* ── Onglet Chants (propriétaire uniquement) ── */}
           {activeTab === 'songs' && (
             <>
-              {/* Toggle tri / regroupement */}
               {songs.length > 0 && (
                 <div style={{ display: 'flex', marginBottom: '1rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.2rem' }}>
                   <button
@@ -213,9 +301,7 @@ export default function ChoirPage() {
                           </div>
                         )}
                       </div>
-                      {isOwner && (
-                        <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
-                      )}
+                      <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
                     </div>
                   ))}
                 </ul>
@@ -224,9 +310,7 @@ export default function ChoirPage() {
                 <>
                   {getGroupedSongs().map(({ tag, songs: groupSongs }) => (
                     <div key={tag} style={{ marginBottom: '1.2rem' }}>
-                      <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.5rem 0' }}>
-                        {tag}
-                      </p>
+                      <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.5rem 0' }}>{tag}</p>
                       <ul className="list-music">
                         {groupSongs.map((s) => (
                           <div key={`${tag}-${s.id}`} className="card-music pink">
@@ -234,9 +318,7 @@ export default function ChoirPage() {
                             <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
                               <strong>{s.title}</strong>
                             </div>
-                            {isOwner && (
-                              <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
-                            )}
+                            <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
                           </div>
                         ))}
                       </ul>
@@ -246,45 +328,36 @@ export default function ChoirPage() {
               )}
 
               {/* Boutons ajout / import (propriétaire uniquement) */}
-              {isOwner && (
-                <>
-                  <div>
-                    <button className="page-button" onClick={() => navigate(`/add-song/${choir.id}`)}>
-                      <i className="fa fa-music"></i> &nbsp; Ajouter un chant
-                    </button>
-                  </div>
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <button className="page-button" onClick={() => navigate(`/import-songs/${choir.id}`)}>
-                      <i className="fa fa-folder-open"></i> &nbsp; Importer des chants
-                    </button>
-                  </div>
-                </>
-              )}
+              <div>
+                <button className="page-button" onClick={() => navigate(`/add-song/${choir.id}`)}>
+                  <i className="fa fa-music"></i> &nbsp; Ajouter un chant
+                </button>
+              </div>
+              <div style={{ marginTop: '0.5rem' }}>
+                <button className="page-button" onClick={() => navigate(`/import-songs/${choir.id}`)}>
+                  <i className="fa fa-folder-open"></i> &nbsp; Importer des chants
+                </button>
+              </div>
             </>
           )}
 
-          {/* Bouton supprimer / quitter (sous les onglets, toujours visible) */}
+          {/* Bouton supprimer / quitter :
+              - propriétaire → supprimer la chorale
+              - membre explicite → quitter la chorale
+              - membre fantôme → pas de bouton (il n'a pas rejoint la chorale) */}
           {isOwner ? (
             <div style={{ marginTop: '1.5rem' }}>
-              <button
-                className="page-button orange"
-                onClick={() => navigate(`/delete-choir/${choir.id}`)}
-              >
-                <i className="fa fa-users"></i> &nbsp;
-                Supprimer la chorale
+              <button className="page-button orange" onClick={() => navigate(`/delete-choir/${choir.id}`)}>
+                <i className="fa fa-users"></i> &nbsp; Supprimer la chorale
               </button>
             </div>
-          ) : (
+          ) : isFullMember ? (
             <div style={{ marginTop: '1.5rem' }}>
-              <button
-                className="page-button orange"
-                onClick={() => navigate(`/leave-choir/${choir.id}`)}
-              >
-                <i className="fa fa-users"></i> &nbsp;
-                Quitter la chorale
+              <button className="page-button orange" onClick={() => navigate(`/leave-choir/${choir.id}`)}>
+                <i className="fa fa-users"></i> &nbsp; Quitter la chorale
               </button>
             </div>
-          )}
+          ) : null}
         </>
       )}
     </div>
