@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
 import { createChoir, countOwnedChoirs } from '../../infrastructure/storage/choirsService';
+import { getStoredChoirs, setStoredChoirs } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function CreationPage() {
@@ -38,25 +39,24 @@ export default function CreationPage() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-
+  
     try {
       // Créer la chorale en base
       const choir = await createChoir(choraleName, user.id);
-
+  
       // Stocker la chorale dans le localStorage
-      const existing = JSON.parse(localStorage.getItem('joined_choirs') || '[]')
-        .filter((c: any) => c !== null);
-      existing.push({ code: choir.code, name: choraleName });
-      localStorage.setItem('joined_choirs', JSON.stringify(existing));
-
-      // Rediriger vers la liste des chorales
+      // (id inclus pour permettre la correspondance avec joined_events)
+      const stored = getStoredChoirs();
+      setStoredChoirs([...stored, { id: choir.id, code: String(choir.code), name: choraleName }]);
+  
+      // Rediriger vers la page de la chorale
       navigate(`/choir/${choir.id}`);
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
     }
-
+  
     setLoading(false);
-  };
+  };  
 
   return (
     <div className="page-container">

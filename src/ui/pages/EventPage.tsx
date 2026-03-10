@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, getEventSongsDetails } from '../../infrastructure/storage/eventsService';
+import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function EventPage() {
@@ -13,6 +14,7 @@ export default function EventPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isDirectEventMember, setIsDirectEventMember] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -20,23 +22,78 @@ export default function EventPage() {
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
 
+      // ── Vérifier les droits d'accès depuis le localStorage ───────────
+      // joined_choirs : chorales rejointes explicitement (code connu)
+      const storedChoirs = getStoredChoirs();
+      // joined_events : événements rejoints (directement ou via une chorale)
+      const storedEvents = getStoredEvents();
+
+      // Vérifier si l'événement est dans joined_events
+      const storedEvent = storedEvents.find((e) => String(e.id) === String(eventId));
+
+      // Vérifier si la chorale de rattachement est dans joined_choirs
+      const choirId = storedEvent?.choir_id;
+      const isChoirMember = choirId
+        ? storedChoirs.some((c) => String(c.id) === String(choirId))
+        : false;
+
+      // L'utilisateur a accès si :
+      // - il a rejoint l'événement directement (storedEvent trouvé)
+      // - OU il a rejoint la chorale de rattachement (isChoirMember)
+      // Note : le cas propriétaire sera vérifié après l'appel Supabase
+      const hasLocalAccess = !!storedEvent || isChoirMember;
+
+      // Vrai uniquement si l'événement a été rejoint directement
+      // (pas via la chorale) — détermine si le bouton "Quitter" est affiché
+      setIsDirectEventMember(!!storedEvent && !isChoirMember);      
+
       try {
-        // Récupérer l'événement
+        // Récupérer l'événement depuis Supabase
         const eventData = await getEvent(eventId!);
         setEvent(eventData);
 
         // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(String(eventData.choir_id));
-        if (currentUser && ownerId === currentUser.id) {
-          setIsOwner(true);
+        const ownerCheck = currentUser && ownerId === currentUser.id;
+        if (ownerCheck) setIsOwner(true);
+
+        // Contrôle d'accès final :
+        // - propriétaire → accès total
+        // - accès local (chorale ou événement rejoint) → accès lecture
+        // - aucun droit → redirection
+        if (!ownerCheck && !hasLocalAccess) {
+          navigate('/');
+          return;
         }
 
         // Récupérer les chants associés à l'événement
         const songsData = await getEventSongsDetails(eventId!);
         setSongs(songsData);
+
       } catch {
-        navigate('/');
-        return;
+        // ── Fallback offline ─────────────────────────────────────────────
+        // Supabase inaccessible : on reconstruit ce qu'on peut depuis le localStorage
+
+        // Vérifier les droits d'accès offline
+        if (!hasLocalAccess) {
+          navigate('/');
+          return;
+        }
+
+        // Reconstituer l'événement depuis le localStorage
+        if (storedEvent) {
+          setEvent({
+            id: storedEvent.id,
+            name: storedEvent.name,
+            code: storedEvent.code,
+            choir_id: storedEvent.choir_id,
+            // event_date non disponible en localStorage → sera null
+            event_date: null,
+          });
+        }
+
+        // Pas de chants disponibles offline (non stockés en localStorage)
+        setSongs([]);
       }
 
       setLoading(false);
@@ -48,7 +105,9 @@ export default function EventPage() {
   const formatCode = (code: string) => code.match(/.{1,2}/g)?.join('-') ?? code;
 
   // Formater une date ISO en jj/mm/aaaa
-  const formatDate = (isoDate: string) => {
+  // Retourne null si la date n'est pas disponible (mode offline)
+  const formatDate = (isoDate: string | null) => {
+    if (!isoDate) return null;
     const d = new Date(isoDate);
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   };
@@ -74,10 +133,17 @@ export default function EventPage() {
             {event.name}
           </h2>
 
+          {/* Code de l'événement : toujours affiché
+              (utile pour partager l'événement avec d'autres membres) */}
           <p><strong>Code :</strong> {formatCode(String(event.code))}</p>
-          <p><strong>Date :</strong> {formatDate(event.event_date)}</p>
 
-          {/* Liste des chants associés à l'événement */}
+          {/* Date : masquée en mode offline car non stockée en localStorage */}
+          {formatDate(event.event_date) && (
+            <p><strong>Date :</strong> {formatDate(event.event_date)}</p>
+          )}
+
+          {/* Liste des chants associés à l'événement
+              Non disponible en mode offline */}
           {songs.length === 0 ? (
             <p>Aucun chant associé à cet événement.</p>
           ) : (
@@ -105,7 +171,21 @@ export default function EventPage() {
             </ul>
           )}
 
-          {/* Boutons propriétaire uniquement */}
+          {/* Bouton quitter : uniquement pour les non-propriétaires
+              ayant rejoint l'événement directement (pas via la chorale) */}
+          {!isOwner && isDirectEventMember && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <button
+                className="page-button pink"
+                onClick={() => navigate(`/leave-event/${eventId}`)}
+              >
+                <i className="fa fa-sign-out"></i> &nbsp;
+                Quitter l'événement
+              </button>
+            </div>
+          )}
+
+          {/* Boutons modification / suppression (propriétaire uniquement) */}
           {isOwner && (
             <>
               <div style={{ marginTop: '2.5rem' }}>

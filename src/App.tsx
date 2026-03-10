@@ -13,6 +13,7 @@ import SongsImportPage from './ui/pages/SongsImportPage';
 import EventEditPage from './ui/pages/EventEditPage';
 import EventPage from './ui/pages/EventPage';
 import EventDeletePage from './ui/pages/EventDeletePage';
+import EventLeavePage from './ui/pages/EventLeavePage';
 import LoginPage from './ui/pages/LoginPage';
 import ResetRequestPage from './ui/pages/ResetRequestPage';
 import ResetPasswordPage from './ui/pages/ResetPasswordPage';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/edit-event/:eventId" element={<EventEditPage />} />
         <Route path="/event/:eventId" element={<EventPage />} />
         <Route path="/delete-event/:eventId" element={<EventDeletePage />} />
+        <Route path="/leave-event/:eventId" element={<EventLeavePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-request" element={<ResetRequestPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
