@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import {
   getSong,
   getSongFiles,
@@ -57,31 +58,72 @@ export default function SongPage() {
       // Récupérer l'utilisateur connecté
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
-
+  
+      // ── Vérifier les droits d'accès depuis le localStorage ───────────
+      const storedChoirs = getStoredChoirs();
+      const storedEvents = getStoredEvents();
+  
       try {
         // Récupérer le chant
         const songData = await getSong(songId!);
         setSong(songData);
-
+  
         const known = await getChoirHashtags(songData.choir_id);
         setAllHashtags(known);
-
-        // Vérifier si l'utilisateur connecté est le propriétaire de la chorale
+  
+        // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(songData.choir_id);
-        if (currentUser && ownerId === currentUser.id) {
-          setIsOwner(true);
+        const ownerCheck = currentUser && ownerId === currentUser.id;
+        if (ownerCheck) setIsOwner(true);
+  
+        // Contrôle d'accès :
+        // - propriétaire → accès total
+        // - membre explicite de la chorale → accès lecture
+        // - a rejoint un événement de cette chorale → accès lecture
+        // - aucun droit → redirection
+        const isChoirMember = storedChoirs.some((c) => String(c.id) === String(songData.choir_id));
+        const hasEventAccess = storedEvents.some((e) => String(e.choir_id) === String(songData.choir_id));
+  
+        if (!ownerCheck && !isChoirMember && !hasEventAccess) {
+          navigate('/');
+          return;
         }
-
+  
         await fetchFiles();
       } catch {
-        navigate('/');
-        return;
+        // ── Fallback offline ─────────────────────────────────────────────
+  
+        // Pour reconstruire le chant offline, on cherche dans joined_events
+        // un événement dont les chants contiennent ce songId
+        const matchingEvent = storedEvents.find((e) =>
+          e.songs?.some((s) => String(s.id) === String(songId))
+        );
+  
+        if (!matchingEvent) {
+          // Pas de droits connus offline → redirection
+          navigate('/');
+          return;
+        }
+  
+        // Reconstituer le chant depuis le cache localStorage
+        const cachedSong = matchingEvent.songs.find((s) => String(s.id) === String(songId));
+        if (cachedSong) {
+          setSong({
+            id: cachedSong.id,
+            title: cachedSong.title,
+            choir_id: matchingEvent.choir_id,
+            hashtags: [], // hashtags non disponibles offline
+          });
+        }
+  
+        // Pas de fichiers disponibles offline
+        setFiles([]);
       }
-
+  
       setLoading(false);
     };
     fetchData();
-
+  
     // Arrêter la musique quand on quitte la page
     return () => {
       if (audioRef.current) {

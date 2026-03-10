@@ -1,4 +1,4 @@
-// infrastructure/choirsService.ts
+// infrastructure/songsService.ts
 import { supabase } from './supabaseClient';
 
 // Convertir un tableau de hashtags en chaîne pour stockage
@@ -85,6 +85,9 @@ export async function deleteSong(songId: string) {
       .remove(filePaths);
     if (storageError) throw storageError;
   }
+
+  // Supprimer les référence à ce chant dans les évènements
+  await supabase.from('event_songs').delete().eq('song_id', songId);
 
   // Supprimer le chant en base
   const { error } = await supabase

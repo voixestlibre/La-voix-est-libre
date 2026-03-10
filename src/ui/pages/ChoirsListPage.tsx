@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
-import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents, StoredEvent } from '../../infrastructure/storage/localStorageService';
+import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents, type StoredEvent } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function MyChoirsPage() {
