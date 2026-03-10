@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
-import { getEventsByCodes, getEventsByChoirIds } from '../../infrastructure/storage/eventsService';
-import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
+import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
+import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents, StoredEvent } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function MyChoirsPage() {
@@ -168,17 +168,25 @@ export default function MyChoirsPage() {
         // Pour chaque événement, on enrichit avec les infos de la chorale :
         // - depuis allLoadedChoirs si la chorale est connue
         // - sinon depuis le localStorage existant (fallback pour les événements directs)
-        const updatedEvents = allValidEvents.map((ev: any) => {
+        const updatedEvents: StoredEvent[] = [];
+        for (const ev of allValidEvents) {
           const choir = allLoadedChoirs.find((c: any) => String(c.id) === String(ev.choir_id));
           const existingEvent = existingEvents.find((e) => String(e.code) === String(ev.code));
-          return {
+
+          // Récupérer les chants depuis Supabase,
+          // ou conserver ceux déjà en localStorage si disponibles
+          let songs: { id: string; title: string }[] = existingEvent?.songs ?? [];
+          try { songs = await getEventSongsTitles(String(ev.id)); } catch {}
+
+          updatedEvents.push({
             code: String(ev.code),
             name: ev.name,
             id: ev.id,
             choir_id: ev.choir_id,
             choir_name: choir ? choir.name : (existingEvent?.choir_name ?? null),
-          };
-        });
+            songs,
+          });
+        }
         setStoredEvents(updatedEvents);
 
         // PARTIE 5 : calculer les chorales fantômes

@@ -119,25 +119,31 @@ export default function EventEditPage() {
   
     setLoading(true);
     try {
+      // Chants sélectionnés sous forme { id, title } pour le cache offline
+      const songsForStorage = selectedSongIds.map((songId) => {
+        const song = availableSongs.find((s) => s.id === songId);
+        return { id: songId, title: song?.title ?? '' };
+      });
+
       if (isEditing) {
         // Mettre à jour l'événement en base
         await updateEvent(eventId!, name, eventDate);
         await setEventSongs(eventId!, selectedSongIds);
-  
-        // Mettre à jour le nom dans joined_events si l'événement y est présent
-        // (le nom peut avoir changé)
+
+        // Mettre à jour le nom et les chants dans joined_events si l'événement y est présent
+        // (le nom ou les chants peuvent avoir changé)
         const stored = getStoredEvents();
-        const updated = stored.map((e) =>
-          String(e.id) === String(eventId) ? { ...e, name } : e
-        );
-        setStoredEvents(updated);
-  
+        setStoredEvents(stored.map((e) =>
+          String(e.id) === String(eventId)
+            ? { ...e, name, songs: songsForStorage }
+            : e
+        ));
         navigate(`/event/${eventId}`);
       } else {
         // Créer l'événement en base
         const data = await createEvent(resolvedChoirId, name, eventDate);
         await setEventSongs(String(data.id), selectedSongIds);
-  
+
         // Stocker le nouvel événement dans joined_events
         // avec les infos de la chorale pour permettre l'accès offline
         // et la construction des chorales fantômes dans MyChoirsPage
@@ -148,8 +154,8 @@ export default function EventEditPage() {
           name: data.name,
           choir_id: data.choir_id,
           choir_name: null, // sera renseigné au prochain passage sur MyChoirsPage
+          songs: songsForStorage,
         }]);
-  
         navigate(`/event/${data.id}`);
       }
     } catch (err: any) {

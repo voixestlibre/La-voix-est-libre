@@ -170,3 +170,15 @@ export async function getEventsByCodes(codes: string[]) {
   if (error) throw error;
   return data || [];
 }
+
+// Récupérer les détails d'un événement avec ses chants (id + title uniquement)
+// Utilisé pour le stockage offline dans joined_events
+export async function getEventSongsTitles(eventId: string): Promise<{ id: string; title: string }[]> {
+  const { data, error } = await supabase
+    .from('event_songs')
+    .select('song_id, songs(id, title)')
+    .eq('event_id', parseInt(eventId, 10))
+    .order('position');
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({ id: row.songs.id, title: row.songs.title }));
+}
