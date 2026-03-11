@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
-import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents, type StoredEvent } from '../../infrastructure/storage/localStorageService';
+import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
 export default function MyChoirsPage() {
@@ -168,27 +168,30 @@ export default function MyChoirsPage() {
         // Pour chaque événement, on enrichit avec les infos de la chorale :
         // - depuis allLoadedChoirs si la chorale est connue
         // - sinon depuis le localStorage existant (fallback pour les événements directs)
-        const updatedEvents: StoredEvent[] = [];
-        for (const ev of allValidEvents) {
+        const updatedEvents = await Promise.all(allValidEvents.map(async (ev: any) => {
           const choir = allLoadedChoirs.find((c: any) => String(c.id) === String(ev.choir_id));
           const existingEvent = existingEvents.find((e) => String(e.code) === String(ev.code));
-
-          // Récupérer les chants depuis Supabase,
-          // ou conserver ceux déjà en localStorage si disponibles
-          let songs: { id: string; title: string }[] = existingEvent?.songs ?? [];
-          try { songs = await getEventSongsTitles(String(ev.id)); } catch {}
-
-          updatedEvents.push({
+          
+          // Récupérer les chants de l'événement pour le cache offline
+          let songs: { id: string; title: string }[] = [];
+          try {
+            songs = await getEventSongsTitles(String(ev.id));
+          } catch {
+            // En cas d'erreur, conserver les chants déjà en cache
+            songs = existingEvent?.songs ?? [];
+          }
+        
+          return {
             code: String(ev.code),
             name: ev.name,
             id: ev.id,
             choir_id: ev.choir_id,
             choir_name: choir ? choir.name : (existingEvent?.choir_name ?? null),
             songs,
-          });
-        }
+          };
+        }));
         setStoredEvents(updatedEvents);
-
+        
         // PARTIE 5 : calculer les chorales fantômes
         // Une chorale fantôme = chorale de rattachement d'un événement direct
         // dont la chorale n'est PAS dans allLoadedChoirs (non rejointe explicitement).

@@ -64,10 +64,9 @@ export default function ChoirJoinPage() {
           const eventsData = await getEventsByChoirIds([String(data.id)]);
           const storedEvents = getStoredEvents();
           const updatedEvents = [...storedEvents];
-          
-          for (const ev of eventsData) {
+
+          await Promise.all(eventsData.map(async (ev: any) => {
             if (!updatedEvents.find((e) => String(e.code) === String(ev.code))) {
-              // Récupérer les chants de chaque événement pour le cache offline
               let songs: { id: string; title: string }[] = [];
               try { songs = await getEventSongsTitles(String(ev.id)); } catch {}
               updatedEvents.push({
@@ -79,7 +78,7 @@ export default function ChoirJoinPage() {
                 songs,
               });
             }
-          }
+          }));
           setStoredEvents(updatedEvents);
         } catch {}
         // Erreur silencieuse : les événements seront synchronisés
@@ -98,14 +97,12 @@ export default function ChoirJoinPage() {
         if (!storedEvents.find((e) => String(e.code) === String(data.code))) {
           let songs: { id: string; title: string }[] = [];
           try { songs = await getEventSongsTitles(String(data.id)); } catch {}
-          
+
           setStoredEvents([...storedEvents, {
             code: String(data.code),
             name: data.name,
             id: data.id,
             choir_id: data.choir_id,
-            // choir_code volontairement omis : l'utilisateur ne doit pas
-            // pouvoir découvrir le code de la chorale via les DevTools
             choir_name: data.choir ? data.choir.name : null,
             songs,
           }]);

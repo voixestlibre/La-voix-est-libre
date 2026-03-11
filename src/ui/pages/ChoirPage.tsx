@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
-import { getChoirSongs } from '../../infrastructure/storage/songsService';
+import { getChoirSongs, toggleFavoriteSong } from '../../infrastructure/storage/songsService';
 import { getChoirEvents } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
@@ -144,18 +144,35 @@ export default function ChoirPage() {
   } as React.CSSProperties);
 
   // Construire la liste des chants groupés par hashtags
-  const getGroupedSongs = () => {
+  const getGroupedSongs = (songsToGroup: any[]) => {
     const groups: { tag: string; songs: any[] }[] = [];
-    const allTags = Array.from(new Set(songs.flatMap((s) => s.hashtags || []))).sort();
+    const allTags = Array.from(new Set(songsToGroup.flatMap((s) => s.hashtags || []))).sort();
     for (const tag of allTags) {
-      groups.push({ tag, songs: songs.filter((s) => s.hashtags?.includes(tag)) });
+      groups.push({ tag, songs: songsToGroup.filter((s) => s.hashtags?.includes(tag)) });
     }
-    const noTagSongs = songs.filter((s) => !s.hashtags || s.hashtags.length === 0);
+    const noTagSongs = songsToGroup.filter((s) => !s.hashtags || s.hashtags.length === 0);
     if (noTagSongs.length > 0) {
       groups.push({ tag: 'Sans hashtag', songs: noTagSongs });
     }
     return groups;
   };
+
+  const handleToggleFavorite = async (songId: string, current: boolean) => {
+    try {
+      await toggleFavoriteSong(songId, !current);
+      // Mettre à jour le state local sans recharger tous les chants
+      setSongs((prev) =>
+        prev.map((s) => s.id === songId ? { ...s, is_favorite: !current } : s)
+      );
+    } catch {}
+  };
+
+  // Favoris en premier, puis ordre alphabétique
+  const sortedSongs = [...songs].sort((a, b) => {
+    if (a.is_favorite && !b.is_favorite) return -1;
+    if (!a.is_favorite && b.is_favorite) return 1;
+    return 0;
+  });
 
   return (
     <div className="page-container">
@@ -288,9 +305,21 @@ export default function ChoirPage() {
               ) : !groupByHashtag ? (
                 // ── Vue alphabétique ──
                 <ul className="list-music">
-                  {songs.map((s) => (
+                  {sortedSongs.map((s) => (
                     <div key={s.id} className="card-music pink">
                       <i className="fa fa-music note"></i>
+                      {/* Icône cœur : toggle favori */}
+                      <i
+                        className="fa fa-heart"
+                        onClick={() => handleToggleFavorite(s.id, s.is_favorite)}
+                        style={{
+                          cursor: 'pointer',
+                          color: s.is_favorite ? '#DA486D' : '#ddd',
+                          fontSize: '1.2rem',
+                          marginLeft: '0.5rem',
+                          marginRight: '1rem',
+                        }}
+                      ></i>
                       <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
                         <strong>{s.title}</strong>
                         {s.hashtags?.length > 0 && (
@@ -301,6 +330,7 @@ export default function ChoirPage() {
                           </div>
                         )}
                       </div>
+                      {/* Icône delete */}
                       <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
                     </div>
                   ))}
@@ -308,16 +338,29 @@ export default function ChoirPage() {
               ) : (
                 // ── Vue par hashtag ──
                 <>
-                  {getGroupedSongs().map(({ tag, songs: groupSongs }) => (
+                  {getGroupedSongs(sortedSongs).map(({ tag, songs: groupSongs }) => (
                     <div key={tag} style={{ marginBottom: '1.2rem' }}>
                       <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.5rem 0' }}>{tag}</p>
                       <ul className="list-music">
                         {groupSongs.map((s) => (
                           <div key={`${tag}-${s.id}`} className="card-music pink">
                             <i className="fa fa-music note"></i>
+                            {/* Icône cœur : toggle favori */}
+                            <i
+                              className="fa fa-heart"
+                              onClick={() => handleToggleFavorite(s.id, s.is_favorite)}
+                              style={{
+                                cursor: 'pointer',
+                                color: s.is_favorite ? '#DA486D' : '#ddd',
+                                fontSize: '1.2rem',
+                                marginLeft: '0.5rem',
+                                marginRight: '1rem',
+                              }}
+                            ></i>
                             <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
                               <strong>{s.title}</strong>
                             </div>
+                            {/* Icône delete */}
                             <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
                           </div>
                         ))}

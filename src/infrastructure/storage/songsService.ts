@@ -161,3 +161,26 @@ export async function songTitleExists(choirId: string, title: string): Promise<b
   if (error) return false;
   return !!data;
 }
+
+
+// Basculer le statut favori d'un chant
+export async function toggleFavoriteSong(songId: string, isFavorite: boolean) {
+  const { error } = await supabase
+    .from('songs')
+    .update({ is_favorite: isFavorite })
+    .eq('id', songId);
+  if (error) throw error;
+}
+
+
+// Récupérer tous les chants accessibles pour une liste de choir_ids
+export async function getSongsByChoirIds(choirIds: string[]) {
+  if (choirIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('songs')
+    .select('id, title, hashtags, choir_id')
+    .in('choir_id', choirIds)
+    .order('title');
+  if (error) throw error;
+  return (data || []).map((s) => ({ ...s, hashtags: stringToHashtags(s.hashtags) }));
+}

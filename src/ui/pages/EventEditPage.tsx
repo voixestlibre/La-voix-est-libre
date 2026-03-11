@@ -129,15 +129,22 @@ export default function EventEditPage() {
         // Mettre à jour l'événement en base
         await updateEvent(eventId!, name, eventDate);
         await setEventSongs(eventId!, selectedSongIds);
-
-        // Mettre à jour le nom et les chants dans joined_events si l'événement y est présent
-        // (le nom ou les chants peuvent avoir changé)
+  
+        // Mettre à jour le nom dans joined_events si l'événement y est présent
+        // (le nom peut avoir changé)
+        const songsForStorage = selectedSongIds
+          .map((id) => availableSongs.find((s) => s.id === id))
+          .filter(Boolean)
+          .map((s) => ({ id: s.id, title: s.title }));
+        
         const stored = getStoredEvents();
-        setStoredEvents(stored.map((e) =>
+        const updated = stored.map((e) =>
           String(e.id) === String(eventId)
             ? { ...e, name, songs: songsForStorage }
             : e
-        ));
+        );
+        setStoredEvents(updated);
+  
         navigate(`/event/${eventId}`);
       } else {
         // Créer l'événement en base
@@ -147,6 +154,11 @@ export default function EventEditPage() {
         // Stocker le nouvel événement dans joined_events
         // avec les infos de la chorale pour permettre l'accès offline
         // et la construction des chorales fantômes dans MyChoirsPage
+        const songsForStorage = selectedSongIds
+          .map((id) => availableSongs.find((s) => s.id === id))
+          .filter(Boolean)
+          .map((s) => ({ id: s.id, title: s.title }));
+        
         const stored = getStoredEvents();
         setStoredEvents([...stored, {
           id: data.id,
@@ -156,6 +168,7 @@ export default function EventEditPage() {
           choir_name: null, // sera renseigné au prochain passage sur MyChoirsPage
           songs: songsForStorage,
         }]);
+
         navigate(`/event/${data.id}`);
       }
     } catch (err: any) {

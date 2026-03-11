@@ -11,6 +11,7 @@ import {
   getSongFileUrl,
   updateSong,
   getChoirHashtags,
+  toggleFavoriteSong,
 } from '../../infrastructure/storage/songsService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
@@ -53,13 +54,14 @@ export default function SongPage() {
   // PDF ouvert sans audio sélectionné, mais des audios sont disponibles
   const [pdfAudioReady, setPdfAudioReady] = useState(false);
 
+
+
   useEffect(() => {
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
   
-      // ── Vérifier les droits d'accès depuis le localStorage ───────────
       const storedChoirs = getStoredChoirs();
       const storedEvents = getStoredEvents();
   
@@ -71,52 +73,45 @@ export default function SongPage() {
         const known = await getChoirHashtags(songData.choir_id);
         setAllHashtags(known);
   
-        // Vérifier si l'utilisateur est propriétaire de la chorale
+        // Vérifier si l'utilisateur connecté est le propriétaire de la chorale
         const ownerId = await getChoirOwner(songData.choir_id);
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
   
-        // Contrôle d'accès :
+        // Contrôle d'accès online
         // - propriétaire → accès total
-        // - membre explicite de la chorale → accès lecture
-        // - a rejoint un événement de cette chorale → accès lecture
-        // - aucun droit → redirection
-        const isChoirMember = storedChoirs.some((c) => String(c.id) === String(songData.choir_id));
-        const hasEventAccess = storedEvents.some((e) => String(e.choir_id) === String(songData.choir_id));
+        // - sinon → accès uniquement si le chant est dans un événement rejoint
+        const hasEventAccess = storedEvents.some((e) =>
+          e.songs?.some((s) => String(s.id) === String(songId))
+        );
   
-        if (!ownerCheck && !isChoirMember && !hasEventAccess) {
+        if (!ownerCheck && !hasEventAccess) {
           navigate('/');
           return;
         }
   
         await fetchFiles();
       } catch {
-        // ── Fallback offline ─────────────────────────────────────────────
-  
-        // Pour reconstruire le chant offline, on cherche dans joined_events
-        // un événement dont les chants contiennent ce songId
+        // Fallback offline : chercher le chant dans les événements du localStorage
         const matchingEvent = storedEvents.find((e) =>
           e.songs?.some((s) => String(s.id) === String(songId))
         );
   
         if (!matchingEvent) {
-          // Pas de droits connus offline → redirection
           navigate('/');
           return;
         }
   
-        // Reconstituer le chant depuis le cache localStorage
         const cachedSong = matchingEvent.songs.find((s) => String(s.id) === String(songId));
         if (cachedSong) {
           setSong({
             id: cachedSong.id,
             title: cachedSong.title,
             choir_id: matchingEvent.choir_id,
-            hashtags: [], // hashtags non disponibles offline
+            hashtags: [],
           });
         }
   
-        // Pas de fichiers disponibles offline
         setFiles([]);
       }
   
@@ -310,6 +305,25 @@ export default function SongPage() {
               >
                 <i className="fa fa-plus"></i> Ajouter un hashtag
               </span>
+            )}
+
+            {/* Icône cœur : toggle favori (propriétaire uniquement) */}
+            {isOwner && (
+              <i
+                className="fa fa-heart"
+                onClick={async () => {
+                  try {
+                    await toggleFavoriteSong(song.id, !song.is_favorite);
+                    setSong({ ...song, is_favorite: !song.is_favorite });
+                  } catch {}
+                }}
+                style={{
+                  cursor: 'pointer',
+                  color: song.is_favorite ? '#DA486D' : '#ddd',
+                  fontSize: '1.4rem',
+                  marginLeft: '0.5rem',
+                }}
+              ></i>
             )}
 
             {/* Champ de saisie rapide avec suggestions */}
