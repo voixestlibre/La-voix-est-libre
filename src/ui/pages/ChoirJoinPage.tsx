@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirByCode } from '../../infrastructure/storage/choirsService';
-import { getEventByCode, getEventsByChoirIds } from '../../infrastructure/storage/eventsService';
+import { getEventByCode, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
@@ -64,18 +64,21 @@ export default function ChoirJoinPage() {
           const eventsData = await getEventsByChoirIds([String(data.id)]);
           const storedEvents = getStoredEvents();
           const updatedEvents = [...storedEvents];
-          eventsData.forEach((ev: any) => {
-            // Ajouter uniquement les événements pas encore présents
+
+          await Promise.all(eventsData.map(async (ev: any) => {
             if (!updatedEvents.find((e) => String(e.code) === String(ev.code))) {
+              let songs: { id: string; title: string }[] = [];
+              try { songs = await getEventSongsTitles(String(ev.id)); } catch {}
               updatedEvents.push({
                 code: String(ev.code),
                 name: ev.name,
                 id: ev.id,
                 choir_id: ev.choir_id,
                 choir_name: data.name,
+                songs,
               });
             }
-          });
+          }));
           setStoredEvents(updatedEvents);
         } catch {}
         // Erreur silencieuse : les événements seront synchronisés
@@ -92,14 +95,16 @@ export default function ChoirJoinPage() {
         // Ajouter l'événement dans joined_events si pas déjà présent
         const storedEvents = getStoredEvents();
         if (!storedEvents.find((e) => String(e.code) === String(data.code))) {
+          let songs: { id: string; title: string }[] = [];
+          try { songs = await getEventSongsTitles(String(data.id)); } catch {}
+
           setStoredEvents([...storedEvents, {
             code: String(data.code),
             name: data.name,
             id: data.id,
             choir_id: data.choir_id,
-            // choir_code volontairement omis : l'utilisateur ne doit pas
-            // pouvoir découvrir le code de la chorale via les DevTools
             choir_name: data.choir ? data.choir.name : null,
+            songs,
           }]);
         }
 

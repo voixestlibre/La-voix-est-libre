@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import {
   getSong,
   getSongFiles,
@@ -10,6 +11,7 @@ import {
   getSongFileUrl,
   updateSong,
   getChoirHashtags,
+  toggleFavoriteSong,
 } from '../../infrastructure/storage/songsService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
@@ -52,36 +54,71 @@ export default function SongPage() {
   // PDF ouvert sans audio sélectionné, mais des audios sont disponibles
   const [pdfAudioReady, setPdfAudioReady] = useState(false);
 
+
+
   useEffect(() => {
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
-
+  
+      const storedChoirs = getStoredChoirs();
+      const storedEvents = getStoredEvents();
+  
       try {
         // Récupérer le chant
         const songData = await getSong(songId!);
         setSong(songData);
-
+  
         const known = await getChoirHashtags(songData.choir_id);
         setAllHashtags(known);
-
+  
         // Vérifier si l'utilisateur connecté est le propriétaire de la chorale
         const ownerId = await getChoirOwner(songData.choir_id);
-        if (currentUser && ownerId === currentUser.id) {
-          setIsOwner(true);
+        const ownerCheck = currentUser && ownerId === currentUser.id;
+        if (ownerCheck) setIsOwner(true);
+  
+        // Contrôle d'accès online
+        // - propriétaire → accès total
+        // - sinon → accès uniquement si le chant est dans un événement rejoint
+        const hasEventAccess = storedEvents.some((e) =>
+          e.songs?.some((s) => String(s.id) === String(songId))
+        );
+  
+        if (!ownerCheck && !hasEventAccess) {
+          navigate('/');
+          return;
         }
-
+  
         await fetchFiles();
       } catch {
-        navigate('/');
-        return;
+        // Fallback offline : chercher le chant dans les événements du localStorage
+        const matchingEvent = storedEvents.find((e) =>
+          e.songs?.some((s) => String(s.id) === String(songId))
+        );
+  
+        if (!matchingEvent) {
+          navigate('/');
+          return;
+        }
+  
+        const cachedSong = matchingEvent.songs.find((s) => String(s.id) === String(songId));
+        if (cachedSong) {
+          setSong({
+            id: cachedSong.id,
+            title: cachedSong.title,
+            choir_id: matchingEvent.choir_id,
+            hashtags: [],
+          });
+        }
+  
+        setFiles([]);
       }
-
+  
       setLoading(false);
     };
     fetchData();
-
+  
     // Arrêter la musique quand on quitte la page
     return () => {
       if (audioRef.current) {
@@ -268,6 +305,25 @@ export default function SongPage() {
               >
                 <i className="fa fa-plus"></i> Ajouter un hashtag
               </span>
+            )}
+
+            {/* Icône cœur : toggle favori (propriétaire uniquement) */}
+            {isOwner && (
+              <i
+                className="fa fa-heart"
+                onClick={async () => {
+                  try {
+                    await toggleFavoriteSong(song.id, !song.is_favorite);
+                    setSong({ ...song, is_favorite: !song.is_favorite });
+                  } catch {}
+                }}
+                style={{
+                  cursor: 'pointer',
+                  color: song.is_favorite ? '#DA486D' : '#ddd',
+                  fontSize: '1.4rem',
+                  marginLeft: '0.5rem',
+                }}
+              ></i>
             )}
 
             {/* Champ de saisie rapide avec suggestions */}
