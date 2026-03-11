@@ -24,6 +24,14 @@ export default function DeleteChoirPage() {
       try {
         const data = await getChoir(id!);
         if (data.owner_id !== currentUser.id) { navigate('/'); return; }
+
+        // Interdire la suppression de la chorale 20393827
+        if (String(data.code) === '20398727') {
+          setChoirName(data.name);
+          setMessage('Cette chorale ne peut pas être supprimée.');
+          return;
+        }       
+
         setChoirName(data.name);
 
         // Compter les chants rattachés à la chorale
@@ -72,11 +80,13 @@ export default function DeleteChoirPage() {
       </div>
       <h2>Supprimer une chorale</h2>
       <p>{confirmMessage}</p>
-      <div style={{ margin: '0.5rem 0' }}>
-        <button className="page-button" onClick={handleDelete} disabled={loading}>
-          {loading ? 'Suppression...' : 'Confirmer'}
-        </button>
-      </div>
+      {!message && (
+        <div style={{ margin: '0.5rem 0' }}>
+          <button className="page-button" onClick={handleDelete} disabled={loading}>
+            {loading ? 'Suppression...' : 'Confirmer'}
+          </button>
+        </div>
+      )}
       <div>
         <button className="page-button2" onClick={() => navigate('/my-choirs')}>
           Annuler
