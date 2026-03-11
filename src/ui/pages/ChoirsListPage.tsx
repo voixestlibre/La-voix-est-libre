@@ -31,6 +31,12 @@ export default function MyChoirsPage() {
       // Extraire uniquement les codes pour les requêtes Supabase
       const joinedCodes = joined.map((c) => c.code);
 
+      // Redirection si l'utilisateur n'a que des événements (pas de chorales explicites)
+      if (joined.length === 0 && getStoredEvents().length > 0 && !currentUser) {
+        navigate('/my-events');
+        return;
+      }
+
       // Contiendra toutes les chorales chargées depuis Supabase,
       // utilisé à la fin pour synchroniser les événements en localStorage
       // et calculer les chorales fantômes

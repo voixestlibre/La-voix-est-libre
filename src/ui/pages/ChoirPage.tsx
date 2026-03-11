@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
-import { getChoirSongs, toggleFavoriteSong } from '../../infrastructure/storage/songsService';
+import { getChoirSongs, toggleFavoriteSong, toggleCommonSong } from '../../infrastructure/storage/songsService';
 import { getChoirEvents } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
@@ -21,6 +21,10 @@ export default function ChoirPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'events' | 'songs'>('events');
   const [groupByHashtag, setGroupByHashtag] = useState(false);
+
+  type FilterState = 'all' | 'true' | 'false';
+  const [filterCommon, setFilterCommon] = useState<FilterState>('all');
+  const [filterFavorite, setFilterFavorite] = useState<FilterState>('all');
 
   useEffect(() => {
     const fetchChoir = async () => {
@@ -148,9 +152,16 @@ export default function ChoirPage() {
     const groups: { tag: string; songs: any[] }[] = [];
     const allTags = Array.from(new Set(songsToGroup.flatMap((s) => s.hashtags || []))).sort();
     for (const tag of allTags) {
-      groups.push({ tag, songs: songsToGroup.filter((s) => s.hashtags?.includes(tag)) });
+      groups.push({
+        tag,
+        songs: songsToGroup
+          .filter((s) => s.hashtags?.includes(tag))
+          .sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' })),
+      });
     }
-    const noTagSongs = songsToGroup.filter((s) => !s.hashtags || s.hashtags.length === 0);
+    const noTagSongs = songsToGroup
+      .filter((s) => !s.hashtags || s.hashtags.length === 0)
+      .sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
     if (noTagSongs.length > 0) {
       groups.push({ tag: 'Sans hashtag', songs: noTagSongs });
     }
@@ -167,11 +178,27 @@ export default function ChoirPage() {
     } catch {}
   };
 
-  // Favoris en premier, puis ordre alphabétique
-  const sortedSongs = [...songs].sort((a, b) => {
-    if (a.is_favorite && !b.is_favorite) return -1;
-    if (!a.is_favorite && b.is_favorite) return 1;
-    return 0;
+  const handleToggleCommon = async (songId: string, current: boolean) => {
+    try {
+      await toggleCommonSong(songId, !current);
+      setSongs((prev) =>
+        prev.map((s) => s.id === songId ? { ...s, is_common: !current } : s)
+      );
+    } catch {}
+  };
+
+  // Ordre alphabétique
+  const sortedSongs = [...songs].sort((a, b) =>
+    a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' })
+  );
+
+  // Appliquer les filtres
+  const filteredSongs = sortedSongs.filter((s) => {
+    if (filterCommon === 'true' && !s.is_common) return false;
+    if (filterCommon === 'false' && s.is_common) return false;
+    if (filterFavorite === 'true' && !s.is_favorite) return false;
+    if (filterFavorite === 'false' && s.is_favorite) return false;
+    return true;
   });
 
   return (
@@ -300,14 +327,94 @@ export default function ChoirPage() {
                 </div>
               )}
 
+              {/* Filtres commun + favori */}
+              {songs.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem', justifyContent: 'center' }}>
+
+                  {/* Filtre commun */}
+                  <i className="fa fa-music" style={{ color: '#888', flexShrink: 0 }}></i>
+                  {(['all', 'true', 'false'] as FilterState[]).map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setFilterCommon(val)}
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        border: 'none',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        backgroundColor:
+                          filterCommon === val
+                            ? val === 'true' ? '#FFB300'
+                            : val === 'false' ? '#DA486D'
+                            : '#044C8D'
+                            : '#E6F2FF',
+                        color: filterCommon === val ? 'white' : '#044C8D',
+                        fontWeight: filterCommon === val ? 'bold' : 'normal',
+                        textDecoration: val === 'false' ? 'line-through' : 'none',
+                      }}
+                    >
+                      {val === 'all' ? 'Tous' : '♪'}
+                    </button>
+                  ))}
+
+                  {/* Séparateur */}
+                  <span style={{ color: '#ddd' }}>|</span>
+
+                  {/* Filtre favori */}
+                  <i className="fa fa-heart" style={{ color: '#888', flexShrink: 0 }}></i>
+                  {(['all', 'true', 'false'] as FilterState[]).map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setFilterFavorite(val)}
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        border: 'none',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        backgroundColor:
+                          filterFavorite === val
+                            ? val === 'true' ? '#DA486D'
+                            : val === 'false' ? '#aaa'
+                            : '#044C8D'
+                            : '#E6F2FF',
+                        color: filterFavorite === val ? 'white' : '#044C8D',
+                        fontWeight: filterFavorite === val ? 'bold' : 'normal',
+                        textDecoration: val === 'false' ? 'line-through' : 'none',
+                      }}
+                    >
+                      {val === 'all' ? 'Tous' : '♥'}
+                    </button>
+                  ))}
+
+                </div>
+              )}
+
+              {/* Compteur */}
+              {songs.length > 0 && (
+                <p style={{ color: '#888', fontSize: '0.85rem', margin: '0 0 0.5rem 0' }}>
+                  {filteredSongs.length} chant{filteredSongs.length !== 1 ? 's' : ''}
+                </p>
+              )}
+
               {songs.length === 0 ? (
                 <p>Aucun chant pour cette chorale.</p>
               ) : !groupByHashtag ? (
                 // ── Vue alphabétique ──
                 <ul className="list-music">
-                  {sortedSongs.map((s) => (
+                  {filteredSongs.map((s) => (
                     <div key={s.id} className="card-music pink">
-                      <i className="fa fa-music note"></i>
+                      <i
+                        className="fa fa-music"
+                        onClick={() => handleToggleCommon(s.id, s.is_common)}
+                        style={{
+                          cursor: 'pointer',
+                          color: s.is_common ? '#FFB300' : '#DA486D',
+                          fontSize: '1.2rem',
+                          marginRight: '0.5rem',
+                        }}
+                      ></i>
                       {/* Icône cœur : toggle favori */}
                       <i
                         className="fa fa-heart"
@@ -338,13 +445,22 @@ export default function ChoirPage() {
               ) : (
                 // ── Vue par hashtag ──
                 <>
-                  {getGroupedSongs(sortedSongs).map(({ tag, songs: groupSongs }) => (
+                  {getGroupedSongs(filteredSongs).map(({ tag, songs: groupSongs }) => (
                     <div key={tag} style={{ marginBottom: '1.2rem' }}>
                       <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.5rem 0' }}>{tag}</p>
                       <ul className="list-music">
                         {groupSongs.map((s) => (
                           <div key={`${tag}-${s.id}`} className="card-music pink">
-                            <i className="fa fa-music note"></i>
+                            <i
+                              className="fa fa-music"
+                              onClick={() => handleToggleCommon(s.id, s.is_common)}
+                              style={{
+                                cursor: 'pointer',
+                                color: s.is_common ? '#FFB300' : '#DA486D',
+                                fontSize: '1.2rem',
+                                marginRight: '0.5rem',
+                              }}
+                            ></i>
                             {/* Icône cœur : toggle favori */}
                             <i
                               className="fa fa-heart"
