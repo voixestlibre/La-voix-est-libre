@@ -119,6 +119,12 @@ export default function EventEditPage() {
   
     setLoading(true);
     try {
+      // Chants sélectionnés sous forme { id, title } pour le cache offline
+      const songsForStorage = selectedSongIds.map((songId) => {
+        const song = availableSongs.find((s) => s.id === songId);
+        return { id: songId, title: song?.title ?? '' };
+      });
+
       if (isEditing) {
         // Mettre à jour l'événement en base
         await updateEvent(eventId!, name, eventDate);
@@ -144,7 +150,7 @@ export default function EventEditPage() {
         // Créer l'événement en base
         const data = await createEvent(resolvedChoirId, name, eventDate);
         await setEventSongs(String(data.id), selectedSongIds);
-  
+
         // Stocker le nouvel événement dans joined_events
         // avec les infos de la chorale pour permettre l'accès offline
         // et la construction des chorales fantômes dans MyChoirsPage

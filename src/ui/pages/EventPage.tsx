@@ -90,10 +90,11 @@ export default function EventPage() {
             // event_date non disponible en localStorage → sera null
             event_date: null,
           });
+          // Chants disponibles offline grâce au cache localStorage
+          setSongs(storedEvent.songs ?? []);
+        } else { 
+          setSongs([]); 
         }
-
-        // Pas de chants disponibles offline (non stockés en localStorage)
-        setSongs([]);
       }
 
       setLoading(false);

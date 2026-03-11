@@ -14,7 +14,8 @@ export interface StoredChoir {
     name: string;
     choir_id: string;
     choir_name: string | null;
-  }
+    songs: { id: string; title: string }[];
+  } 
   
   // ── Chorales ───────────────────────────────────────────────────────────
   

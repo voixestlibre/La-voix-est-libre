@@ -68,7 +68,7 @@ export async function getChoirEvents(choirId: string) {
     .from('events')
     .select('*')
     .eq('choir_id', parseInt(choirId, 10))
-    .order('event_date');
+    .order('event_date', { ascending: false });
   if (error) throw error;
   return data || [];
 }
