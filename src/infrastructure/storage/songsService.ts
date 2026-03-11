@@ -1,4 +1,4 @@
-// infrastructure/choirsService.ts
+// infrastructure/songsService.ts
 import { supabase } from './supabaseClient';
 
 // Convertir un tableau de hashtags en chaîne pour stockage
@@ -86,6 +86,9 @@ export async function deleteSong(songId: string) {
     if (storageError) throw storageError;
   }
 
+  // Supprimer les référence à ce chant dans les évènements
+  await supabase.from('event_songs').delete().eq('song_id', songId);
+
   // Supprimer le chant en base
   const { error } = await supabase
     .from('songs')
@@ -157,4 +160,27 @@ export async function songTitleExists(choirId: string, title: string): Promise<b
     .single();
   if (error) return false;
   return !!data;
+}
+
+
+// Basculer le statut favori d'un chant
+export async function toggleFavoriteSong(songId: string, isFavorite: boolean) {
+  const { error } = await supabase
+    .from('songs')
+    .update({ is_favorite: isFavorite })
+    .eq('id', songId);
+  if (error) throw error;
+}
+
+
+// Récupérer tous les chants accessibles pour une liste de choir_ids
+export async function getSongsByChoirIds(choirIds: string[]) {
+  if (choirIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('songs')
+    .select('id, title, hashtags, choir_id')
+    .in('choir_id', choirIds)
+    .order('title');
+  if (error) throw error;
+  return (data || []).map((s) => ({ ...s, hashtags: stringToHashtags(s.hashtags) }));
 }

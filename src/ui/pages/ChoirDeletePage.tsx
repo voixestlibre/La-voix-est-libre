@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
-import { getChoir, deleteChoir } from '../../infrastructure/storage/choirsService';
-import { countChoirSongs, getChoirSongIds, deleteSong } from '../../infrastructure/storage/songsService';
-import { getChoirEventIds, deleteEvent } from '../../infrastructure/storage/eventsService';
+import { getChoir, deleteChoirCascade } from '../../infrastructure/storage/choirsService';
+import { countChoirSongs } from '../../infrastructure/storage/songsService';
 import { removeStoredChoir, removeStoredEventsByChoirId } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 
@@ -25,6 +24,14 @@ export default function DeleteChoirPage() {
       try {
         const data = await getChoir(id!);
         if (data.owner_id !== currentUser.id) { navigate('/'); return; }
+
+        // Interdire la suppression de la chorale 20393827
+        if (String(data.code) === '20398727') {
+          setChoirName(data.name);
+          setMessage('Cette chorale ne peut pas être supprimée.');
+          return;
+        }       
+
         setChoirName(data.name);
 
         // Compter les chants rattachés à la chorale
@@ -40,25 +47,13 @@ export default function DeleteChoirPage() {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      // Récupérer les ids de tous les chants et les supprimer un par un
-      // (deleteSong supprime aussi les fichiers dans le bucket)
-      const songIds = await getChoirSongIds(id!);
-      for (const songId of songIds) {
-        await deleteSong(songId);
-      }
-
-      // Supprimer tous les événements et leurs liens avec les chants
-      const eventIds = await getChoirEventIds(id!);
-      for (const eventId of eventIds) {
-        await deleteEvent(eventId);
-      }
-
-      // Nettoyer le localStorage : supprimer la chorale et ses événements
+      // deleteChoirCascade supprime tout : fichiers bucket, event_songs, events, songs, choir
+      await deleteChoirCascade(id!);
+  
+      // Nettoyer le localStorage
       removeStoredChoir(id!);
       removeStoredEventsByChoirId(id!);
-
-      // Supprimer la chorale
-      await deleteChoir(id!);
+  
       navigate('/my-choirs');
     } catch (err: any) {
       setMessage(`Erreur lors de la suppression : ${err.message}`);
@@ -85,11 +80,13 @@ export default function DeleteChoirPage() {
       </div>
       <h2>Supprimer une chorale</h2>
       <p>{confirmMessage}</p>
-      <div style={{ margin: '0.5rem 0' }}>
-        <button className="page-button" onClick={handleDelete} disabled={loading}>
-          {loading ? 'Suppression...' : 'Confirmer'}
-        </button>
-      </div>
+      {!message && (
+        <div style={{ margin: '0.5rem 0' }}>
+          <button className="page-button" onClick={handleDelete} disabled={loading}>
+            {loading ? 'Suppression...' : 'Confirmer'}
+          </button>
+        </div>
+      )}
       <div>
         <button className="page-button2" onClick={() => navigate('/my-choirs')}>
           Annuler

@@ -68,7 +68,7 @@ export async function getChoirEvents(choirId: string) {
     .from('events')
     .select('*')
     .eq('choir_id', parseInt(choirId, 10))
-    .order('event_date');
+    .order('event_date', { ascending: false });
   if (error) throw error;
   return data || [];
 }
@@ -169,4 +169,30 @@ export async function getEventsByCodes(codes: string[]) {
     .in('code', codes);
   if (error) throw error;
   return data || [];
+}
+
+
+export async function getEventSongsTitles(eventId: string): Promise<{ id: string; title: string }[]> {
+  // Étape 1 : récupérer les song_ids de l'événement, ordonnés par position
+  const { data: eventSongs, error: e1 } = await supabase
+    .from('event_songs')
+    .select('song_id')
+    .eq('event_id', parseInt(eventId, 10))
+    .order('position');
+  if (e1) throw e1;
+  if (!eventSongs || eventSongs.length === 0) return [];
+
+  const songIds = eventSongs.map((row: any) => row.song_id);
+
+  // Étape 2 : récupérer les titres des chants correspondants
+  const { data: songs, error: e2 } = await supabase
+    .from('songs')
+    .select('id, title')
+    .in('id', songIds);
+  if (e2) throw e2;
+
+  // Réordonner selon l'ordre de l'événement (l'étape 2 ne garantit pas l'ordre)
+  return songIds
+    .map((id: string) => songs.find((s: any) => s.id === id))
+    .filter(Boolean);
 }

@@ -102,3 +102,61 @@ export async function countOwnedChoirs(userId: string) {
   if (error) throw error;
   return count ?? 0;
 }
+
+// Supprimer une chorale et toutes ses données associées :
+// événements, liens event_songs, chants, et fichiers dans le bucket
+export async function deleteChoirCascade(choirId: string) {
+
+  // Étape 1 : récupérer tous les événements de la chorale
+  const { data: events } = await supabase
+    .from('events')
+    .select('id')
+    .eq('choir_id', parseInt(choirId, 10));
+
+  if (events && events.length > 0) {
+    const eventIds = events.map((e: any) => e.id);
+
+    // Étape 2 : supprimer les liens event_songs de ces événements
+    await supabase
+      .from('event_songs')
+      .delete()
+      .in('event_id', eventIds);
+
+    // Étape 3 : supprimer les événements
+    await supabase
+      .from('events')
+      .delete()
+      .in('id', eventIds);
+  }
+
+  // Étape 4 : récupérer tous les chants de la chorale
+  const { data: songs } = await supabase
+    .from('songs')
+    .select('id')
+    .eq('choir_id', choirId);
+
+  if (songs && songs.length > 0) {
+    const songIds = songs.map((s: any) => s.id);
+
+    // Étape 5 : supprimer les fichiers du bucket pour chaque chant
+    for (const songId of songIds) {
+      const { data: files } = await supabase.storage
+        .from('songs-files')
+        .list(songId);
+      if (files && files.length > 0) {
+        const paths = files.map((f: any) => `${songId}/${f.name}`);
+        await supabase.storage.from('songs-files').remove(paths);
+      }
+    }
+
+    // Étape 6 : supprimer les chants
+    await supabase
+      .from('songs')
+      .delete()
+      .in('id', songIds);
+  }
+
+  // Étape 7 : supprimer la chorale elle-même
+  const { error } = await supabase.from('choirs').delete().eq('id', choirId);
+  if (error) throw error;
+}
