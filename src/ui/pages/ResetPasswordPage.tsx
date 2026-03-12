@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { setSessionFromHash, resetPassword } from '../../infrastructure/storage/authService';
 import '../../App.css';
 
 export default function ResetPasswordPage() {
@@ -15,40 +15,32 @@ export default function ResetPasswordPage() {
     const params = new URLSearchParams(hash.substring(1));
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
-
+  
     if (!accessToken) {
       setMessage("Lien invalide ou expiré. Veuillez refaire une demande de réinitialisation.");
       return;
     }
-
-    supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken || '',
-    }).then(({ error }) => {
-      if (error) {
-        setMessage("Session invalide. Veuillez refaire une demande de réinitialisation.");
-      } else {
-        setReady(true);
-      }
-    });
+  
+    setSessionFromHash(accessToken, refreshToken || '')
+      .then(() => setReady(true))
+      .catch(() => setMessage("Session invalide. Veuillez refaire une demande de réinitialisation."));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-
-    const { error } = await supabase.auth.updateUser({ password });
-
-    if (error) {
-      setMessage(`Erreur : ${error.message}`);
-    } else {
+  
+    try {
+      await resetPassword(password);
       setMessage('Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter.');
       setSuccess(true);
       setPassword('');
+    } catch (err: any) {
+      setMessage(`Erreur : ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

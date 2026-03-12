@@ -13,16 +13,17 @@ export async function getEvent(eventId: string) {
 }
 
 // Créer un événement
-export async function createEvent(choirId: string, name: string, eventDate: string) {
+export async function createEvent(choirId: string, name: string, eventDate: string, createdBy: number) {
   const code = await generateUniqueCode();
   const { data, error } = await supabase
     .from('events')
-    .insert([{ choir_id: parseInt(choirId, 10), name, event_date: eventDate, code }])
+    .insert([{ choir_id: parseInt(choirId, 10), name, event_date: eventDate, created_by: createdBy, code }])
     .select()
     .single();
   if (error) throw error;
   return data;
 }
+
 
 // Modifier un événement
 export async function updateEvent(eventId: string, name: string, eventDate: string) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
-import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
+import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage/authService';
+import { getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import {
   getSong,
   getSongFiles,
@@ -23,6 +23,7 @@ export default function SongPage() {
   const [song, setSong] = useState<any>(null);
   const [files, setFiles] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [isDelegate, setIsDelegate] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -63,7 +64,6 @@ export default function SongPage() {
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
   
-      const storedChoirs = getStoredChoirs();
       const storedEvents = getStoredEvents();
   
       try {
@@ -78,15 +78,21 @@ export default function SongPage() {
         const ownerId = await getChoirOwner(songData.choir_id);
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
-  
+
+        // Vérifier la délégation
+        const delegations = currentUser ? await getUserDelegations(currentUser.email!) : [];
+        const delegateCheck = delegations.includes(String(songData.choir_id));
+        setIsDelegate(delegateCheck);
+
         // Contrôle d'accès online
         // - propriétaire → accès total
+        // - delegation → accès partiel
         // - sinon → accès uniquement si le chant est dans un événement rejoint
         const hasEventAccess = storedEvents.some((e) =>
           e.songs?.some((s) => String(s.id) === String(songId))
         );
   
-        if (!ownerCheck && !hasEventAccess) {
+        if (!ownerCheck && !delegateCheck && !hasEventAccess) {
           navigate('/');
           return;
         }
@@ -308,18 +314,18 @@ export default function SongPage() {
               </span>
             )}
 
-            {/* Icône note : toggle commun (propriétaire uniquement) */}
-            {isOwner && (
+            {/* Icône note : toggle commun — visible par délégué, modifiable par propriétaire uniquement */}
+            {(isOwner || isDelegate) && (
               <i
                 className="fa fa-music"
-                onClick={async () => {
+                onClick={isOwner ? async () => {
                   try {
                     await toggleCommonSong(song.id, !song.is_common);
                     setSong({ ...song, is_common: !song.is_common });
                   } catch {}
-                }}
+                } : undefined}
                 style={{
-                  cursor: 'pointer',
+                  cursor: isOwner ? 'pointer' : 'default',
                   color: song.is_common ? '#FFB300' : '#ddd',
                   fontSize: '1.4rem',
                   marginLeft: '0.5rem',
@@ -327,18 +333,18 @@ export default function SongPage() {
               ></i>
             )}
 
-            {/* Icône cœur : toggle favori (propriétaire uniquement) */}
-            {isOwner && (
+            {/* Icône cœur : toggle favori — visible par délégué, modifiable par propriétaire uniquement */}
+            {(isOwner || isDelegate) && (
               <i
                 className="fa fa-heart"
-                onClick={async () => {
+                onClick={isOwner ? async () => {
                   try {
                     await toggleFavoriteSong(song.id, !song.is_favorite);
                     setSong({ ...song, is_favorite: !song.is_favorite });
                   } catch {}
-                }}
+                } : undefined}
                 style={{
-                  cursor: 'pointer',
+                  cursor: isOwner ? 'pointer' : 'default',
                   color: song.is_favorite ? '#DA486D' : '#ddd',
                   fontSize: '1.4rem',
                   marginLeft: '0.5rem',

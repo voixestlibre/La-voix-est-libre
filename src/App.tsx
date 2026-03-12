@@ -6,6 +6,7 @@ import ChoirDeletePage from './ui/pages/ChoirDeletePage';
 import ChoirLeavePage from './ui/pages/ChoirLeavePage';
 import ChoirPage from './ui/pages/ChoirPage';
 import ChoirJoinPage from './ui/pages/ChoirJoinPage';
+import ChoirDelegationPage from './ui/pages/ChoirDelegationPage';
 import SongEditPage from './ui/pages/SongEditPage';
 import SongPage from './ui/pages/SongPage';
 import SongDeletePage from './ui/pages/SongDeletePage';
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/leave-choir/:id" element={<ChoirLeavePage />} />  
         <Route path="/choir/:id" element={<ChoirPage />} />  
         <Route path="/join-choir" element={<ChoirJoinPage />} />  
+        <Route path="/choir-delegation/:choirId" element={<ChoirDelegationPage />} />
         <Route path="/add-song/:choirId" element={<SongEditPage />} />  
         <Route path="/edit-song/:songId" element={<SongEditPage />} />  
         <Route path="/song/:songId" element={<SongPage />} />  

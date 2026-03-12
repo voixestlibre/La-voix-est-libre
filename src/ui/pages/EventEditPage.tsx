@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs } from '../../infrastructure/storage/songsService';
 import { getEvent, createEvent, updateEvent, getEventSongs, setEventSongs } from '../../infrastructure/storage/eventsService';
@@ -20,6 +20,8 @@ export default function EventEditPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   // Liste de tous les chants de la chorale
   const [availableSongs, setAvailableSongs] = useState<any[]>([]);
   const [songFilter, setSongFilter] = useState('');
@@ -33,13 +35,16 @@ export default function EventEditPage() {
     const init = async () => {
       const currentUser = await getCurrentUser();
       if (!currentUser) { navigate('/'); return; }
-
+      setCurrentUser(currentUser);
+      
+      const delegations = await getUserDelegations(currentUser.email!);
+      
       if (isEditing) {
         try {
           const data = await getEvent(eventId!);
           setName(data.name);
           setResolvedChoirId(String(data.choir_id));
-
+      
           // Décomposer la date en jour / mois / année
           if (data.event_date) {
             const d = new Date(data.event_date);
@@ -47,11 +52,15 @@ export default function EventEditPage() {
             setMonth(String(d.getMonth() + 1).padStart(2, '0'));
             setYear(String(d.getFullYear()));
           }
-
-          // Vérifier que l'utilisateur est propriétaire
+      
+          // Autoriser : propriétaire OU créateur de l'événement
           const ownerId = await getChoirOwner(String(data.choir_id));
-          if (ownerId !== currentUser.id) { navigate('/'); return; }
-
+          const userParamId = await getUserParamId(currentUser.email!);
+          const isOwner = ownerId === currentUser.id;
+          const isCreator = userParamId !== null && data.created_by === userParamId;
+      
+          if (!isOwner && !isCreator) { navigate('/'); return; }
+      
           // Charger les chants de la chorale et les chants déjà associés
           const [songs, eventSongIds] = await Promise.all([
             getChoirSongs(String(data.choir_id)),
@@ -64,9 +73,12 @@ export default function EventEditPage() {
         }
       } else {
         const ownerId = await getChoirOwner(choirId!);
-        if (ownerId !== currentUser.id) { navigate('/'); return; }
+        const isOwner = ownerId === currentUser.id;
+        const isDelegate = delegations.includes(choirId!);
+      
+        if (!isOwner && !isDelegate) { navigate('/'); return; }
+      
         setResolvedChoirId(choirId!);
-
         // Charger les chants de la chorale
         const songs = await getChoirSongs(choirId!);
         setAvailableSongs(songs);
@@ -141,7 +153,8 @@ export default function EventEditPage() {
         navigate(`/event/${eventId}`);
       } else {
         // Créer l'événement en base
-        const data = await createEvent(resolvedChoirId, name, eventDate);
+        const userParamId = await getUserParamId(currentUser!.email!);
+        const data = await createEvent(resolvedChoirId, name, eventDate, userParamId!);
         await setEventSongs(String(data.id), selectedSongIds);
 
         const stored = getStoredEvents();
