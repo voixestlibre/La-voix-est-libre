@@ -184,3 +184,13 @@ export async function getSongsByChoirIds(choirIds: string[]) {
   if (error) throw error;
   return (data || []).map((s) => ({ ...s, hashtags: stringToHashtags(s.hashtags) }));
 }
+
+
+// Basculer le statut common d'un chant
+export async function toggleCommonSong(songId: string, isCommon: boolean) {
+  const { error } = await supabase
+    .from('songs')
+    .update({ is_common: isCommon })
+    .eq('id', songId);
+  if (error) throw error;
+}

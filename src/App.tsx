@@ -14,6 +14,7 @@ import EventEditPage from './ui/pages/EventEditPage';
 import EventPage from './ui/pages/EventPage';
 import EventDeletePage from './ui/pages/EventDeletePage';
 import EventLeavePage from './ui/pages/EventLeavePage';
+import EventsListPage from './ui/pages/EventsListPage';
 import LoginPage from './ui/pages/LoginPage';
 import ResetRequestPage from './ui/pages/ResetRequestPage';
 import ResetPasswordPage from './ui/pages/ResetPasswordPage';
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/event/:eventId" element={<EventPage />} />
         <Route path="/delete-event/:eventId" element={<EventDeletePage />} />
         <Route path="/leave-event/:eventId" element={<EventLeavePage />} />
+        <Route path="/my-events" element={<EventsListPage />} />  
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-request" element={<ResetRequestPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

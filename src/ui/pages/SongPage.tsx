@@ -12,6 +12,7 @@ import {
   updateSong,
   getChoirHashtags,
   toggleFavoriteSong,
+  toggleCommonSong,
 } from '../../infrastructure/storage/songsService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
@@ -305,6 +306,25 @@ export default function SongPage() {
               >
                 <i className="fa fa-plus"></i> Ajouter un hashtag
               </span>
+            )}
+
+            {/* Icône note : toggle commun (propriétaire uniquement) */}
+            {isOwner && (
+              <i
+                className="fa fa-music"
+                onClick={async () => {
+                  try {
+                    await toggleCommonSong(song.id, !song.is_common);
+                    setSong({ ...song, is_common: !song.is_common });
+                  } catch {}
+                }}
+                style={{
+                  cursor: 'pointer',
+                  color: song.is_common ? '#FFB300' : '#ddd',
+                  fontSize: '1.4rem',
+                  marginLeft: '0.5rem',
+                }}
+              ></i>
             )}
 
             {/* Icône cœur : toggle favori (propriétaire uniquement) */}
