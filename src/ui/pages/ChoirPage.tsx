@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs, toggleFavoriteSong, toggleCommonSong } from '../../infrastructure/storage/songsService';
 import { getChoirEvents } from '../../infrastructure/storage/eventsService';
@@ -22,6 +22,9 @@ export default function ChoirPage() {
   const [activeTab, setActiveTab] = useState<'events' | 'songs'>('events');
   const [groupByHashtag, setGroupByHashtag] = useState(false);
 
+  const [isDelegate, setIsDelegate] = useState(false);
+  const [userParamId, setUserParamId] = useState<number | null>(null);
+
   type FilterState = 'all' | 'true' | 'false';
   const [filterCommon, setFilterCommon] = useState<FilterState>('all');
   const [filterFavorite, setFilterFavorite] = useState<FilterState>('all');
@@ -31,6 +34,16 @@ export default function ChoirPage() {
       // Récupérer l'utilisateur connecté (peut être null)
       const currentUser = await getCurrentUser();
       if (currentUser) setUser(currentUser);
+
+      // Vérifier si l'utilisateur a la délégation pour cette chorale
+      const delegations = currentUser ? await getUserDelegations(currentUser.email!) : [];
+      setIsDelegate(delegations.includes(String(id)));
+
+      // Récupérer l'id dans users_param pour identifier les événements créés par le délégué
+      if (currentUser) {
+        const paramId = await getUserParamId(currentUser.email!);
+        setUserParamId(paramId);
+      }
 
       // ── Vérifier les droits d'accès depuis le localStorage ───────────
       // joined_choirs : chorales rejointes explicitement (code connu)
@@ -74,9 +87,9 @@ export default function ChoirPage() {
           return;
         }
 
-        // Récupérer les chants (propriétaire uniquement) et les événements en parallèle
+        // Récupérer les chants (propriétaire et délégations) et les événements en parallèle
         const [songsData, eventsData] = await Promise.all([
-          ownerCheck ? getChoirSongs(id!) : Promise.resolve([]),
+          (ownerCheck || delegations.includes(String(id))) ? getChoirSongs(id!) : Promise.resolve([]),
           getChoirEvents(id!),
         ]);
         setSongs(songsData);
@@ -228,9 +241,9 @@ export default function ChoirPage() {
             <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
           )}
 
-          {/* Onglets : l'onglet Chants n'est visible que pour le propriétaire */}
+          {/* Onglets : l'onglet Chants n'est visible que pour le propriétaire et pour les utilisateurs ayant reçu délégation */}
           <div style={{ display: 'flex', marginBottom: '1.5rem', borderBottom: '3px solid #ddd' }}>
-            {isOwner && (
+            {(isOwner || isDelegate) && (
               <button style={tabStyle('songs')} onClick={() => setActiveTab('songs')}>
                 <i className="fa fa-music"></i> &nbsp; Chants
               </button>
@@ -269,6 +282,12 @@ export default function ChoirPage() {
                           className="fa fa-trash trash"
                           onClick={() => navigate(`/delete-event/${ev.id}`)}
                         ></i>
+                      ) : isDelegate && userParamId !== null && ev.created_by === userParamId ? (
+                        // Délégué : peut supprimer les événements qu'il a créés
+                        <i
+                          className="fa fa-trash trash"
+                          onClick={() => navigate(`/delete-event/${ev.id}`)}
+                        ></i>
                       ) : !isFullMember ? (
                         // Membre fantôme : a rejoint l'événement directement → peut le quitter
                         <i
@@ -283,7 +302,7 @@ export default function ChoirPage() {
               )}
 
               {/* Bouton ajout événement (propriétaire uniquement) */}
-              {isOwner && (
+              {(isOwner || isDelegate) && (
                 <div>
                   <button
                     className="page-button"
@@ -407,7 +426,7 @@ export default function ChoirPage() {
                     <div key={s.id} className="card-music pink">
                       <i
                         className="fa fa-music"
-                        onClick={() => handleToggleCommon(s.id, s.is_common)}
+                        onClick={isOwner ? () => handleToggleCommon(s.id, s.is_common) : undefined}
                         style={{
                           cursor: 'pointer',
                           color: s.is_common ? '#FFB300' : '#DA486D',
@@ -418,7 +437,7 @@ export default function ChoirPage() {
                       {/* Icône cœur : toggle favori */}
                       <i
                         className="fa fa-heart"
-                        onClick={() => handleToggleFavorite(s.id, s.is_favorite)}
+                        onClick={isOwner ? () => handleToggleFavorite(s.id, s.is_favorite) : undefined}
                         style={{
                           cursor: 'pointer',
                           color: s.is_favorite ? '#DA486D' : '#ddd',
@@ -437,8 +456,10 @@ export default function ChoirPage() {
                           </div>
                         )}
                       </div>
-                      {/* Icône delete */}
-                      <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
+                      {/* Icône delete — propriétaire uniquement */}
+                      {isOwner && (
+                        <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
+                      )}
                     </div>
                   ))}
                 </ul>
@@ -453,7 +474,7 @@ export default function ChoirPage() {
                           <div key={`${tag}-${s.id}`} className="card-music pink">
                             <i
                               className="fa fa-music"
-                              onClick={() => handleToggleCommon(s.id, s.is_common)}
+                              onClick={isOwner ? () => handleToggleCommon(s.id, s.is_common) : undefined}
                               style={{
                                 cursor: 'pointer',
                                 color: s.is_common ? '#FFB300' : '#DA486D',
@@ -464,7 +485,7 @@ export default function ChoirPage() {
                             {/* Icône cœur : toggle favori */}
                             <i
                               className="fa fa-heart"
-                              onClick={() => handleToggleFavorite(s.id, s.is_favorite)}
+                              onClick={isOwner ? () => handleToggleFavorite(s.id, s.is_favorite) : undefined}
                               style={{
                                 cursor: 'pointer',
                                 color: s.is_favorite ? '#DA486D' : '#ddd',
@@ -476,8 +497,10 @@ export default function ChoirPage() {
                             <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
                               <strong>{s.title}</strong>
                             </div>
-                            {/* Icône delete */}
-                            <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
+                            {/* Icône delete — propriétaire uniquement */}
+                            {isOwner && (
+                              <i className="fa fa-trash trash" onClick={() => navigate(`/delete-song/${s.id}`)}></i>
+                            )}
                           </div>
                         ))}
                       </ul>
@@ -486,17 +509,21 @@ export default function ChoirPage() {
                 </>
               )}
 
-              {/* Boutons ajout / import (propriétaire uniquement) */}
-              <div>
-                <button className="page-button" onClick={() => navigate(`/add-song/${choir.id}`)}>
-                  <i className="fa fa-music"></i> &nbsp; Ajouter un chant
-                </button>
-              </div>
-              <div style={{ marginTop: '0.5rem' }}>
-                <button className="page-button" onClick={() => navigate(`/import-songs/${choir.id}`)}>
-                  <i className="fa fa-folder-open"></i> &nbsp; Importer des chants
-                </button>
-              </div>
+              {/* Boutons ajout / import / délégation — propriétaire uniquement */}
+              {isOwner && (
+                <>
+                  <div>
+                    <button className="page-button" onClick={() => navigate(`/add-song/${choir.id}`)}>
+                      <i className="fa fa-music"></i> &nbsp; Ajouter un chant
+                    </button>
+                  </div>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <button className="page-button" onClick={() => navigate(`/import-songs/${choir.id}`)}>
+                      <i className="fa fa-folder-open"></i> &nbsp; Importer des chants
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -505,11 +532,18 @@ export default function ChoirPage() {
               - membre explicite → quitter la chorale
               - membre fantôme → pas de bouton (il n'a pas rejoint la chorale) */}
           {isOwner ? (
-            <div style={{ marginTop: '1.5rem' }}>
-              <button className="page-button orange" onClick={() => navigate(`/delete-choir/${choir.id}`)}>
-                <i className="fa fa-users"></i> &nbsp; Supprimer la chorale
-              </button>
-            </div>
+            <>
+              <div style={{ marginTop: '1.5rem' }}>
+                <button className="page-button" onClick={() => navigate(`/choir-delegation/${choir.id}`)}>
+                  <i className="fa fa-user-plus"></i> &nbsp; Donner délégation
+                </button>
+              </div>
+              <div style={{ marginTop: '1.5rem' }}>
+                <button className="page-button orange" onClick={() => navigate(`/delete-choir/${choir.id}`)}>
+                  <i className="fa fa-users"></i> &nbsp; Supprimer la chorale
+                </button>
+              </div>
+            </>
           ) : isFullMember ? (
             <div style={{ marginTop: '1.5rem' }}>
               <button className="page-button orange" onClick={() => navigate(`/leave-choir/${choir.id}`)}>

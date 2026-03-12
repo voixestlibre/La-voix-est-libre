@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, getEventSongsDetails } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
@@ -12,6 +12,7 @@ export default function EventPage() {
   const [event, setEvent] = useState<any>(null);
   const [songs, setSongs] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDirectEventMember, setIsDirectEventMember] = useState(false);
@@ -56,6 +57,11 @@ export default function EventPage() {
         const ownerId = await getChoirOwner(String(eventData.choir_id));
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
+
+        // Vérifier si l'utilisateur est le créateur de l'événement
+        const userParamId = currentUser ? await getUserParamId(currentUser.email!) : null;
+        const creatorCheck = userParamId !== null && eventData.created_by === userParamId;
+        if (creatorCheck) setIsCreator(true);
 
         // Contrôle d'accès final :
         // - propriétaire → accès total
@@ -186,8 +192,8 @@ export default function EventPage() {
             </div>
           )}
 
-          {/* Boutons modification / suppression (propriétaire uniquement) */}
-          {isOwner && (
+          {/* Boutons modification / suppression (propriétaire ou délégué) */}
+          {(isOwner || isCreator) && (
             <>
               <div style={{ marginTop: '2.5rem' }}>
                 <button

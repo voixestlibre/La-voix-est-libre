@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser, requestPasswordReset } from '../../infrastructure/storage/authService';
 import '../../App.css';
 
 export default function RequestResetPage() {
@@ -11,32 +11,25 @@ export default function RequestResetPage() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user || null);
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
     };
     getUser();
-  }, []);  
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-
-    const redirectUrl = 'https://lavoixestlibre.netlify.app/reset-password' ;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl, 
-    });
-
-    if (error) {
+  
+    try {
+      await requestPasswordReset(email);
+      setMessage('Si cet email est connu, vous allez recevoir un email avec un lien pour réinitialiser votre mot de passe.');
+    } catch {
       setMessage('Erreur lors de la demande de réinitialisation.');
-      console.error(error);
-    } else {
-      setMessage(
-        'Si cet email est connu, vous allez recevoir un email avec un lien pour réinitialiser votre mot de passe.'
-      );
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

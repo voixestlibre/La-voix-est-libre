@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, deleteEvent } from '../../infrastructure/storage/eventsService';
 import { removeStoredEvent } from '../../infrastructure/storage/localStorageService';
@@ -24,9 +24,14 @@ export default function EventDeletePage() {
         const eventData = await getEvent(eventId!);
         setEvent(eventData);
 
-        // Vérifier que l'utilisateur est propriétaire de la chorale
+        // Vérifier que l'utilisateur est propriétaire de la chorale ou créateur de l'évenement
         const ownerId = await getChoirOwner(String(eventData.choir_id));
-        if (ownerId !== currentUser.id) { navigate('/'); return; }
+        const isOwner = ownerId === currentUser.id;
+        
+        const userParamId = await getUserParamId(currentUser.email!);
+        const isCreator = userParamId !== null && eventData.created_by === userParamId;
+        
+        if (!isOwner && !isCreator) { navigate('/'); return; }
       } catch {
         navigate('/');
       }

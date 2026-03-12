@@ -66,3 +66,100 @@ export async function getUserParam(email: string) {
   if (error) throw error;
   return data;
 }
+
+export async function requestPasswordReset(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://lavoixestlibre.netlify.app/reset-password',
+  });
+  if (error) throw error;
+}
+
+
+export async function setSessionFromHash(accessToken: string, refreshToken: string) {
+  const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  if (error) throw error;
+}
+
+export async function resetPassword(password: string) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
+
+export async function createDelegateAccount(email: string, password: string, choirId: string) {
+  const { data: existing } = await supabase
+    .from('users_param')
+    .select('email, choirs_delegations')
+    .eq('email', email)
+    .single();
+
+  if (existing) {
+    const current = existing.choirs_delegations
+      ? existing.choirs_delegations.split(';').map((s: string) => s.trim())
+      : [];
+    if (!current.includes(String(choirId))) {
+      const updated = [...current, String(choirId)].join(';');
+      await supabase.from('users_param').update({ choirs_delegations: updated }).eq('email', email);
+    }
+    return { isNewUser: false };
+  } else {
+    // Sauvegarder la session courante (email1)
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+    // Créer le compte email2
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+
+    // Insérer dans users_param
+    await supabase.from('users_param').insert([{
+      email,
+      is_admin: false,
+      choirs_nb: 0,
+      choirs_delegations: String(choirId),
+    }]);
+
+    // Restaurer la session email1
+    if (currentSession) {
+      await supabase.auth.setSession({
+        access_token: currentSession.access_token,
+        refresh_token: currentSession.refresh_token,
+      });
+    }
+
+    return { isNewUser: true };
+  }
+}
+
+
+export async function getUserDelegations(email: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('users_param')
+    .select('choirs_delegations')
+    .eq('email', email)
+    .single();
+  if (!data?.choirs_delegations) return [];
+  return data.choirs_delegations.split(';').map((s: string) => s.trim());
+}
+
+
+export async function getUserParamId(email: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('users_param')
+    .select('id')
+    .eq('email', email)
+    .single();
+  if (error) return null;
+  return data.id;
+}
+
+
+export async function getChoirDelegates(choirId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('users_param')
+    .select('email, choirs_delegations')
+    .not('choirs_delegations', 'is', null);
+  if (error) throw error;
+  return (data || [])
+    .filter((row) => row.choirs_delegations?.split(';').includes(choirId))
+    .map((row) => row.email);
+}
