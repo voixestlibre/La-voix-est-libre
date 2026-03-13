@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs, toggleFavoriteSong, toggleCommonSong } from '../../infrastructure/storage/songsService';
 import { getChoirEvents } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function ChoirPage() {
   const { id } = useParams();
@@ -15,7 +16,6 @@ export default function ChoirPage() {
   // Vrai si l'utilisateur a rejoint la chorale explicitement (via son code)
   // Faux si l'utilisateur n'a accès qu'à certains événements (chorale "fantôme")
   const [isFullMember, setIsFullMember] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [songs, setSongs] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,6 @@ export default function ChoirPage() {
     const fetchChoir = async () => {
       // Récupérer l'utilisateur connecté (peut être null)
       const currentUser = await getCurrentUser();
-      if (currentUser) setUser(currentUser);
 
       // Vérifier si l'utilisateur a la délégation pour cette chorale
       const delegations = currentUser ? await getUserDelegations(currentUser.email!) : [];
@@ -216,17 +215,7 @@ export default function ChoirPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
-
+      <TopBar />
       {loading ? <div className="spinner"></div> : (
         <>
           <h2>
@@ -446,7 +435,7 @@ export default function ChoirPage() {
                           marginRight: '1rem',
                         }}
                       ></i>
-                      <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
+                      <div className="text" onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: `/choir/${id}` } })} style={{ cursor: 'pointer' }}>
                         <strong>{s.title}</strong>
                         {s.hashtags?.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
@@ -494,7 +483,7 @@ export default function ChoirPage() {
                                 marginRight: '1rem',
                               }}
                             ></i>
-                            <div className="text" onClick={() => navigate(`/song/${s.id}`)} style={{ cursor: 'pointer' }}>
+                            <div className="text" onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: `/choir/${id}` } })} style={{ cursor: 'pointer' }}>
                               <strong>{s.title}</strong>
                             </div>
                             {/* Icône delete — propriétaire uniquement */}

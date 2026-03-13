@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
 import { createChoir, countOwnedChoirs } from '../../infrastructure/storage/choirsService';
 import { getStoredChoirs, setStoredChoirs } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function CreationPage() {
   const [choraleName, setChoraleName] = useState('');
@@ -12,6 +13,7 @@ export default function CreationPage() {
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<any>(null);
   const [canCreate, setCanCreate] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export default function CreationPage() {
       if (param && count >= param.choirs_nb) {
         setCanCreate(false);
       }
+      setPageLoading(false);
     };
     init();
   }, [navigate]);
@@ -49,8 +52,8 @@ export default function CreationPage() {
       const stored = getStoredChoirs();
       setStoredChoirs([...stored, { id: choir.id, code: String(choir.code), name: choraleName }]);
   
-      // Rediriger vers la page de la chorale
-      navigate(`/choir/${choir.id}`);
+      // Rediriger vers la page de la chorale (en supprimant la page de création de l'historique)
+      navigate(`/choir/${choir.id}`, { replace: true });
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
     }
@@ -60,37 +63,35 @@ export default function CreationPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-        </Link>
-      </div>
+      <TopBar />
       <h2>Créer une chorale</h2>
 
-      {!message && canCreate && (
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Nom de la chorale"
-            value={choraleName}
-            onChange={(e) => setChoraleName(e.target.value)}
-            required
-            className="page-form-input"
-          />
-          <button className="page-button" type="submit" disabled={loading}>
-            {loading ? 'Création...' : 'Créer'}
-          </button>
-        </form>
+      {pageLoading || loading ? <div className="spinner"></div> : (
+        <>
+          {!message && canCreate && (
+            <form onSubmit={handleSubmit}>
+              <input
+                type="text"
+                placeholder="Nom de la chorale"
+                value={choraleName}
+                onChange={(e) => setChoraleName(e.target.value)}
+                required
+                className="page-form-input"
+              />
+              <button className="page-button" type="submit">
+                Créer
+              </button>
+            </form>
+          )}
+
+          {!message && !canCreate && (
+            <p>Vous avez atteint le nombre maximum de chorales autorisées.</p>
+          )}
+
+          {message && <p>{message}</p>}
+        </>
       )}
 
-      {!message && !canCreate && (
-        <p>Vous avez atteint le nombre maximum de chorales autorisées.</p>
-      )}
-
-      {message && <p>{message}</p>}
     </div>
   );
 }

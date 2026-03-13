@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, getEventSongsDetails } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function EventPage() {
   const { eventId } = useParams();
@@ -13,7 +14,6 @@ export default function EventPage() {
   const [songs, setSongs] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDirectEventMember, setIsDirectEventMember] = useState(false);
 
@@ -21,7 +21,6 @@ export default function EventPage() {
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté (peut être null)
       const currentUser = await getCurrentUser();
-      if (currentUser) setUser(currentUser);
 
       // ── Vérifier les droits d'accès depuis le localStorage ───────────
       // joined_choirs : chorales rejointes explicitement (code connu)
@@ -121,18 +120,8 @@ export default function EventPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        {/* Retour vers la page de la chorale */}
-        <Link to={`/choir/${event?.choir_id}`} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
-
+      <TopBar />
+      
       {loading ? <div className="spinner"></div> : (
         <>
           <h2>
@@ -160,7 +149,7 @@ export default function EventPage() {
                   <i className="fa fa-music note"></i>
                   <div
                     className="text"
-                    onClick={() => navigate(`/song/${s.id}`)}
+                    onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: `/event/${eventId}` } })}
                     style={{ cursor: 'pointer' }}
                   >
                     <strong>{s.title}</strong>

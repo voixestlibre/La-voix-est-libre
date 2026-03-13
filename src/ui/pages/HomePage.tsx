@@ -88,7 +88,7 @@ export default function HomePage() {
     <div className="page-container">
   
       {/* Barre du haut avec icône loupe */}
-      <div className="top-bar">
+      <div className="top-bar" style={{ borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
         {allSongs.length > 0 && !showSearch && (
           <i
             className="fa fa-search navigation"
@@ -131,7 +131,7 @@ export default function HomePage() {
               {searchResults.map((s) => (
                 <div
                   key={s.id}
-                  onClick={() => navigate(`/song/${s.id}`)}
+                  onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: '/' } })}
                   style={{
                     padding: '0.6rem 1rem', fontSize: '0.9rem',
                     cursor: 'pointer', color: '#222',

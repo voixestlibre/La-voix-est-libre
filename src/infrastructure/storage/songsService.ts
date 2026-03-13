@@ -26,7 +26,7 @@ export async function getSong(songId: string) {
     .from('songs')
     .select('*')
     .eq('id', songId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return { ...data, hashtags: stringToHashtags(data.hashtags) };
 }

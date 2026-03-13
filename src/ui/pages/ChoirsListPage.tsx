@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function MyChoirsPage() {
   const [user, setUser] = useState<any>(null);
@@ -31,9 +32,9 @@ export default function MyChoirsPage() {
       // Extraire uniquement les codes pour les requêtes Supabase
       const joinedCodes = joined.map((c) => c.code);
 
-      // Redirection si l'utilisateur n'a que des événements (pas de chorales explicites)
+      // Redirection si l'utilisateur n'a que des événements (pas de chorales explicites), en supprimant cette page de l'historique
       if (joined.length === 0 && getStoredEvents().length > 0 && !currentUser) {
-        navigate('/my-events');
+        navigate('/my-events', { replace: true });
         return;
       }
 
@@ -258,17 +259,7 @@ export default function MyChoirsPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {/* Lien déconnexion visible uniquement si connecté */}
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
+      <TopBar />
       <h2>Mes chorales</h2>
 
       {loading ? (

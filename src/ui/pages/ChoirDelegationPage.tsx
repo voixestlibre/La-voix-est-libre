@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, createDelegateAccount, getChoirDelegates } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function ChoirDelegationPage() {
   const { choirId } = useParams();
@@ -13,6 +14,7 @@ export default function ChoirDelegationPage() {
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
   const [delegates, setDelegates] = useState<string[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const init = async () => {
@@ -24,6 +26,7 @@ export default function ChoirDelegationPage() {
 
       const list = await getChoirDelegates(choirId!);
       setDelegates(list);
+      setPageLoading(false);
     };
     init();
   }, [choirId, navigate]);
@@ -58,64 +61,63 @@ export default function ChoirDelegationPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to={`/choir/${choirId}`} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-      </div>
-
+      <TopBar />
       <h2>Donner délégation</h2>
 
-      {/* Liste des délégués existants */}
-      {delegates.length > 0 && (
+      {pageLoading || loading ? <div className="spinner"></div> : (
         <>
-          <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>
-            Utilisateurs ayant reçu délégation :
-          </p>
-          <ul style={{ listStyle: 'none', padding: 0, marginBottom: '1.5rem' }}>
-            {delegates.map((d) => (
-              <li key={d} style={{ padding: '0.4rem 0', borderBottom: '1px solid #E6F2FF', color: '#333' }}>
-                <i className="fa fa-user" style={{ color: '#044C8D', marginRight: '0.5rem' }}></i>
-                {d}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+          {/* Liste des délégués existants */}
+          {delegates.length > 0 && (
+            <>
+              <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>
+                Utilisateurs ayant reçu délégation :
+              </p>
+              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '1.5rem' }}>
+                {delegates.map((d) => (
+                  <li key={d} style={{ padding: '0.4rem 0', borderBottom: '1px solid #E6F2FF', color: '#333' }}>
+                    <i className="fa fa-user" style={{ color: '#044C8D', marginRight: '0.5rem' }}></i>
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
-      {!success ? (
-        <form onSubmit={handleSubmit}>
-          <input type="email" placeholder="Email" value={email}
-            onChange={(e) => setEmail(e.target.value)} required className="page-form-input" />
-          <input type="password" placeholder="Mot de passe" value={password}
-            onChange={(e) => setPassword(e.target.value)} required className="page-form-input" />
-          <div style={{ marginTop: '1rem' }}>
-            <button type="submit" className="page-button" disabled={loading}>
-              {loading ? 'Validation...' : 'Valider'}
-            </button>
-          </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <button type="button" className="page-button2"
-              onClick={() => navigate(`/choir/${choirId}`)}>
-              Annuler
-            </button>
-          </div>
-        </form>
-      ) : (
-        <>
-          <p style={{ color: 'green' }}>{message}</p>
-          <button className="page-button" onClick={() => { setSuccess(false); setEmail(''); setPassword(''); setMessage(''); }}>
-            Créer une autre délégation
-          </button>
-          <div style={{ marginTop: '0.5rem' }}>
-            <button className="page-button2" onClick={() => navigate(`/choir/${choirId}`)}>
-              Retour à la chorale
-            </button>
-          </div>
-        </>
-      )}
+          {!success ? (
+            <form onSubmit={handleSubmit}>
+              <input type="email" placeholder="Email" value={email}
+                onChange={(e) => setEmail(e.target.value)} required className="page-form-input" />
+              <input type="password" placeholder="Mot de passe" value={password}
+                onChange={(e) => setPassword(e.target.value)} required className="page-form-input" />
+              <div style={{ marginTop: '1rem' }}>
+                <button type="submit" className="page-button" disabled={loading}>
+                  {loading ? 'Validation...' : 'Valider'}
+                </button>
+              </div>
+              <div style={{ marginTop: '0.5rem' }}>
+                <button type="button" className="page-button2"
+                  onClick={() => navigate(`/choir/${choirId}`)}>
+                  Annuler
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <p style={{ color: 'green' }}>{message}</p>
+              <button className="page-button" onClick={() => { setSuccess(false); setEmail(''); setPassword(''); setMessage(''); }}>
+                Créer une autre délégation
+              </button>
+              <div style={{ marginTop: '0.5rem' }}>
+                <button className="page-button2" onClick={() => navigate(`/choir/${choirId}`)}>
+                  Retour à la chorale
+                </button>
+              </div>
+            </>
+          )}
 
-      {!success && message && <p style={{ color: 'red' }}>{message}</p>}
+          {!success && message && <p style={{ color: 'red' }}>{message}</p>}
+        </>
+      )}          
     </div>
   );
 }

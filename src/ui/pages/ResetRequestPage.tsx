@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { getCurrentUser, requestPasswordReset } from '../../infrastructure/storage/authService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function RequestResetPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
+      await getCurrentUser();
+      setPageLoading(false);
     };
     getUser();
   }, []);
@@ -21,7 +21,6 @@ export default function RequestResetPage() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-  
     try {
       await requestPasswordReset(email);
       setMessage('Si cet email est connu, vous allez recevoir un email avec un lien pour réinitialiser votre mot de passe.');
@@ -34,31 +33,23 @@ export default function RequestResetPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/login" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-          </Link>}
-      </div>
+      <TopBar />
       <h2>Réinitialiser le mot de passe</h2>
-      {!message && (
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="Votre email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="page-form-input"
-          />
-          <button type="submit" className="page-button" disabled={loading}>
-            {loading ? 'Envoi...' : 'Réinitialiser'}
-          </button>
-        </form>
+
+      {pageLoading || loading ? <div className="spinner"></div> : (
+        <>
+          {!message && (
+            <form onSubmit={handleSubmit}>
+              <input type="email" placeholder="Votre email" value={email}
+                onChange={(e) => setEmail(e.target.value)} required className="page-form-input" />
+              <button type="submit" className="page-button">
+                Réinitialiser
+              </button>
+            </form>
+          )}
+          {message && <p>{message}</p>}
+        </>
       )}
-      {message && <p>{message}</p>}
     </div>
   );
 }
