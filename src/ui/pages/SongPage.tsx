@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage/authService';
 import { getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../../infrastructure/storage/songsService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function SongPage() {
   const { songId } = useParams();
@@ -24,7 +25,6 @@ export default function SongPage() {
   const [files, setFiles] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [isDelegate, setIsDelegate] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // Ajout d'hashtags
@@ -62,7 +62,6 @@ export default function SongPage() {
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté
       const currentUser = await getCurrentUser();
-      if (currentUser) setUser(currentUser);
   
       const storedEvents = getStoredEvents();
   
@@ -105,7 +104,7 @@ export default function SongPage() {
         );
   
         if (!matchingEvent) {
-          navigate('/');
+          navigate('/my-choirs', { replace: true }); 
           return;
         }
   
@@ -274,17 +273,8 @@ export default function SongPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to={`/choir/${song?.choir_id}`} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
-
+      <TopBar />
+      
       {loading ? <div className="spinner"></div> : (
         <>
           <h2>

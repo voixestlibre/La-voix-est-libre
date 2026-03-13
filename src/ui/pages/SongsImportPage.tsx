@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { createSong, uploadSongFile, fileExists, songTitleExists } from '../../infrastructure/storage/songsService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 type ImportReport = {
   songTitle: string;
@@ -162,15 +163,7 @@ export default function ImportSongPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to={`/choir/${choirId}`} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-        </Link>
-      </div>
-
+      <TopBar />
       <h2>Importer des chants</h2>
       {reports.length === 0 && <div><p>Déposez un ou plusieurs répertoires contenant les fichiers audio et PDF.</p><p>Le nom de chaque répertoire sera utilisé pour créer un chant, et les différents fichiers audio ou pdf des répertoires seront associés aux chants correspondants...</p></div>}
 

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getEventsByChoirIds, getEventsByCodes } from '../../infrastructure/storage/eventsService';
 import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
 import { getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function MyEventsPage() {
-  const [user, setUser] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [ownedChoirIds, setOwnedChoirIds] = useState<string[]>([]);
   const [directEventCodes, setDirectEventCodes] = useState<string[]>([]);
@@ -17,7 +17,6 @@ export default function MyEventsPage() {
   useEffect(() => {
     const fetchData = async () => {
       const currentUser = await getCurrentUser();
-      if (currentUser) setUser(currentUser);
 
       const storedEvents = getStoredEvents();
       const storedCodes = storedEvents.map((e) => String(e.code));
@@ -102,16 +101,7 @@ export default function MyEventsPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
+      <TopBar />
       <h2>Mes événements</h2>
 
       {loading ? (

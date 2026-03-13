@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs } from '../../infrastructure/storage/songsService';
 import { getEvent, createEvent, updateEvent, getEventSongs, setEventSongs } from '../../infrastructure/storage/eventsService';
 import { getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function EventEditPage() {
   const { choirId, eventId } = useParams();
@@ -21,6 +22,7 @@ export default function EventEditPage() {
   const [message, setMessage] = useState('');
 
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   // Liste de tous les chants de la chorale
   const [availableSongs, setAvailableSongs] = useState<any[]>([]);
@@ -68,6 +70,7 @@ export default function EventEditPage() {
           ]);
           setAvailableSongs(songs);
           setSelectedSongIds(eventSongIds);
+          setPageLoading(false);
         } catch {
           navigate('/');
         }
@@ -82,6 +85,7 @@ export default function EventEditPage() {
         // Charger les chants de la chorale
         const songs = await getChoirSongs(choirId!);
         setAvailableSongs(songs);
+        setPageLoading(false);
       }
     };
     init();
@@ -194,185 +198,179 @@ export default function EventEditPage() {
       
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to={backUrl} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-        </Link>
-      </div>
-
+      <TopBar />
       <h2>{isEditing ? 'Modifier un événement' : 'Ajouter un événement'}</h2>
 
-      <form onSubmit={handleSubmit}>
-        {/* Nom de l'événement */}
-        <input
-          type="text"
-          placeholder="Nom de l'événement"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="page-form-input"
-        />
-
-        {/* Saisie de la date en 3 champs séparés */}
-        <div style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', alignItems: 'center' }}>
+      {pageLoading || loading ? <div className="spinner"></div> : (
+        <form onSubmit={handleSubmit}>
+          {/* Nom de l'événement */}
           <input
             type="text"
-            placeholder="JJ"
-            value={day}
-            onChange={(e) => setDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            maxLength={2}
-            style={{ width: '3.5rem', textAlign: 'center' }}
-            className="page-form-input"
+            placeholder="Nom de l'événement"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             required
-          />
-          <span style={{ color: '#044C8D', fontWeight: 'bold' }}>/</span>
-          <input
-            type="text"
-            placeholder="MM"
-            value={month}
-            onChange={(e) => setMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            maxLength={2}
-            style={{ width: '3.5rem', textAlign: 'center' }}
             className="page-form-input"
-            required
           />
-          <span style={{ color: '#044C8D', fontWeight: 'bold' }}>/</span>
-          <input
-            type="text"
-            placeholder="AAAA"
-            value={year}
-            onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            maxLength={4}
-            style={{ width: '5rem', textAlign: 'center' }}
-            className="page-form-input"
-            required
-          />
-        </div>
 
-        {/* Sélection et ordonnancement des chants */}
-        {availableSongs.length > 0 && (
-          <>
-            {/* Ordre des chants sélectionnés */}
-            {selectedSongIds.length > 0 && (
-              <>
-                <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
-                  Ordre des chants :
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
-                  {selectedSongIds.map((id, index) => {
-                    const song = availableSongs.find((s) => s.id === id);
-                    if (!song) return null;
-                    return (
-                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.4rem 0.8rem' }}>
-                        <span style={{ color: '#044C8D', fontWeight: 'bold', minWidth: '1.5rem' }}>{index + 1}.</span>
-                        <span style={{ flex: 1 }}>{song.title}</span>
-                        <button type="button" onClick={() => moveSong(index, -1)} disabled={index === 0}
-                          style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', color: index === 0 ? '#ccc' : '#044C8D', fontSize: '1rem' }}>▲</button>
-                        <button type="button" onClick={() => moveSong(index, 1)} disabled={index === selectedSongIds.length - 1}
-                          style={{ background: 'none', border: 'none', cursor: index === selectedSongIds.length - 1 ? 'default' : 'pointer', color: index === selectedSongIds.length - 1 ? '#ccc' : '#044C8D', fontSize: '1rem' }}>▼</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+          {/* Saisie de la date en 3 champs séparés */}
+          <div style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="JJ"
+              value={day}
+              onChange={(e) => setDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
+              maxLength={2}
+              style={{ width: '3.5rem', textAlign: 'center' }}
+              className="page-form-input"
+              required
+            />
+            <span style={{ color: '#044C8D', fontWeight: 'bold' }}>/</span>
+            <input
+              type="text"
+              placeholder="MM"
+              value={month}
+              onChange={(e) => setMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
+              maxLength={2}
+              style={{ width: '3.5rem', textAlign: 'center' }}
+              className="page-form-input"
+              required
+            />
+            <span style={{ color: '#044C8D', fontWeight: 'bold' }}>/</span>
+            <input
+              type="text"
+              placeholder="AAAA"
+              value={year}
+              onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              maxLength={4}
+              style={{ width: '5rem', textAlign: 'center' }}
+              className="page-form-input"
+              required
+            />
+          </div>
 
-            <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
-              Chants associés à cet événement :
-            </p>
-
-            {/* Toggle alphabétique / par hashtag */}
-            <div style={{ display: 'flex', marginBottom: '0.6rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.2rem', width: 'fit-content' }}>
-              <button type="button" onClick={() => setGroupByHashtag(false)}
-                style={{ padding: '0.3rem 0.8rem', border: 'none', borderRadius: '6px', cursor: 'pointer', backgroundColor: !groupByHashtag ? '#044C8D' : 'transparent', color: !groupByHashtag ? 'white' : '#044C8D', fontSize: '0.8rem', fontWeight: !groupByHashtag ? 'bold' : 'normal' }}>
-                <i className="fa fa-arrow-down-a-z"></i> &nbsp; Alphabétique
-              </button>
-              <button type="button" onClick={() => setGroupByHashtag(true)}
-                style={{ padding: '0.3rem 0.8rem', border: 'none', borderRadius: '6px', cursor: 'pointer', backgroundColor: groupByHashtag ? '#044C8D' : 'transparent', color: groupByHashtag ? 'white' : '#044C8D', fontSize: '0.8rem', fontWeight: groupByHashtag ? 'bold' : 'normal' }}>
-                <i className="fa fa-hashtag"></i> &nbsp; Par hashtag
-              </button>
-            </div>
-
-            {/* Filtre de recherche */}
-            <div style={{ position: 'relative', display: 'inline-flex', width: 'fit-content' }}>
-              <input type="text" placeholder="Rechercher..." value={songFilter}
-                onChange={(e) => setSongFilter(e.target.value)}
-                className="page-form-input"
-                style={{ fontSize: '0.85rem', margin: '0.3rem 0 0.6rem 0', paddingRight: '2.5rem', width: '220px' }}
-              />
-              {songFilter && (
-                <span onClick={() => setSongFilter('')}
-                  style={{ position: 'absolute', right: '-1.4rem', top: '50%', transform: 'translateY(-60%)', cursor: 'pointer', color: '#044C8D', fontSize: '1.3rem', lineHeight: 1 }}>×</span>
-              )}
-            </div>
-
-            {/* Liste des chants */}
-            {(() => {
-              const filtered = availableSongs.filter((s) => {
-                if (!songFilter.trim()) return true;
-                const search = normalize(songFilter);
-                return normalize(s.title).includes(search) || s.hashtags?.some((h: string) => normalize(h).includes(search));
-              });
-
-              const SongCheckbox = ({ s }: { s: any }) => (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={selectedSongIds.includes(s.id)} onChange={() => toggleSong(s.id)}
-                    style={{ width: '1.2rem', height: '1.2rem', accentColor: '#044C8D' }} />
-                  <span>
-                    {s.title}
-                    {!groupByHashtag && s.hashtags?.length > 0 && (
-                      <span style={{ color: '#888', fontSize: '0.85rem', marginLeft: '0.4rem' }}>({s.hashtags.join(', ')})</span>
-                    )}
-                  </span>
-                </label>
-              );
-
-              if (!groupByHashtag) {
-                return (
+          {/* Sélection et ordonnancement des chants */}
+          {availableSongs.length > 0 && (
+            <>
+              {/* Ordre des chants sélectionnés */}
+              {selectedSongIds.length > 0 && (
+                <>
+                  <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
+                    Ordre des chants :
+                  </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
-                    {filtered.map((s) => <SongCheckbox key={s.id} s={s} />)}
+                    {selectedSongIds.map((id, index) => {
+                      const song = availableSongs.find((s) => s.id === id);
+                      if (!song) return null;
+                      return (
+                        <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.4rem 0.8rem' }}>
+                          <span style={{ color: '#044C8D', fontWeight: 'bold', minWidth: '1.5rem' }}>{index + 1}.</span>
+                          <span style={{ flex: 1 }}>{song.title}</span>
+                          <button type="button" onClick={() => moveSong(index, -1)} disabled={index === 0}
+                            style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', color: index === 0 ? '#ccc' : '#044C8D', fontSize: '1rem' }}>▲</button>
+                          <button type="button" onClick={() => moveSong(index, 1)} disabled={index === selectedSongIds.length - 1}
+                            style={{ background: 'none', border: 'none', cursor: index === selectedSongIds.length - 1 ? 'default' : 'pointer', color: index === selectedSongIds.length - 1 ? '#ccc' : '#044C8D', fontSize: '1rem' }}>▼</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
+                Chants associés à cet événement :
+              </p>
+
+              {/* Toggle alphabétique / par hashtag */}
+              <div style={{ display: 'flex', marginBottom: '0.6rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.2rem', width: 'fit-content' }}>
+                <button type="button" onClick={() => setGroupByHashtag(false)}
+                  style={{ padding: '0.3rem 0.8rem', border: 'none', borderRadius: '6px', cursor: 'pointer', backgroundColor: !groupByHashtag ? '#044C8D' : 'transparent', color: !groupByHashtag ? 'white' : '#044C8D', fontSize: '0.8rem', fontWeight: !groupByHashtag ? 'bold' : 'normal' }}>
+                  <i className="fa fa-arrow-down-a-z"></i> &nbsp; Alphabétique
+                </button>
+                <button type="button" onClick={() => setGroupByHashtag(true)}
+                  style={{ padding: '0.3rem 0.8rem', border: 'none', borderRadius: '6px', cursor: 'pointer', backgroundColor: groupByHashtag ? '#044C8D' : 'transparent', color: groupByHashtag ? 'white' : '#044C8D', fontSize: '0.8rem', fontWeight: groupByHashtag ? 'bold' : 'normal' }}>
+                  <i className="fa fa-hashtag"></i> &nbsp; Par hashtag
+                </button>
+              </div>
+
+              {/* Filtre de recherche */}
+              <div style={{ position: 'relative', display: 'inline-flex', width: 'fit-content' }}>
+                <input type="text" placeholder="Rechercher..." value={songFilter}
+                  onChange={(e) => setSongFilter(e.target.value)}
+                  className="page-form-input"
+                  style={{ fontSize: '0.85rem', margin: '0.3rem 0 0.6rem 0', paddingRight: '2.5rem', width: '220px' }}
+                />
+                {songFilter && (
+                  <span onClick={() => setSongFilter('')}
+                    style={{ position: 'absolute', right: '-1.4rem', top: '50%', transform: 'translateY(-60%)', cursor: 'pointer', color: '#044C8D', fontSize: '1.3rem', lineHeight: 1 }}>×</span>
+                )}
+              </div>
+
+              {/* Liste des chants */}
+              {(() => {
+                const filtered = availableSongs.filter((s) => {
+                  if (!songFilter.trim()) return true;
+                  const search = normalize(songFilter);
+                  return normalize(s.title).includes(search) || s.hashtags?.some((h: string) => normalize(h).includes(search));
+                });
+
+                const SongCheckbox = ({ s }: { s: any }) => (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={selectedSongIds.includes(s.id)} onChange={() => toggleSong(s.id)}
+                      style={{ width: '1.2rem', height: '1.2rem', accentColor: '#044C8D' }} />
+                    <span>
+                      {s.title}
+                      {!groupByHashtag && s.hashtags?.length > 0 && (
+                        <span style={{ color: '#888', fontSize: '0.85rem', marginLeft: '0.4rem' }}>({s.hashtags.join(', ')})</span>
+                      )}
+                    </span>
+                  </label>
+                );
+
+                if (!groupByHashtag) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                      {filtered.map((s) => <SongCheckbox key={s.id} s={s} />)}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ marginBottom: '1rem' }}>
+                    {getGroupedSongs(filtered).map(({ tag, songs: groupSongs }) => (
+                      <div key={tag} style={{ marginBottom: '0.8rem' }}>
+                        <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.4rem 0 0.3rem 0', fontSize: '0.9rem' }}>
+                          {tag}
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.5rem' }}>
+                          {groupSongs.map((s) => <SongCheckbox key={`${tag}-${s.id}`} s={s} />)}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 );
-              }
+              })()}
+            </>
+          )}
 
-              return (
-                <div style={{ marginBottom: '1rem' }}>
-                  {getGroupedSongs(filtered).map(({ tag, songs: groupSongs }) => (
-                    <div key={tag} style={{ marginBottom: '0.8rem' }}>
-                      <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.4rem 0 0.3rem 0', fontSize: '0.9rem' }}>
-                        {tag}
-                      </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.5rem' }}>
-                        {groupSongs.map((s) => <SongCheckbox key={`${tag}-${s.id}`} s={s} />)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </>
-        )}
+          {availableSongs.length === 0 && (
+            <p style={{ color: '#888', margin: '0.5rem 0 1rem 0' }}>
+              Aucun chant enregistré pour cette chorale.
+            </p>
+          )}
 
-        {availableSongs.length === 0 && (
-          <p style={{ color: '#888', margin: '0.5rem 0 1rem 0' }}>
-            Aucun chant enregistré pour cette chorale.
-          </p>
-        )}
-
-        <div style={{ marginBottom: '0.5rem' }}>
-          <button className="page-button" type="submit" disabled={loading}>
-            {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
-          </button>
-        </div>
-        <div>
-          <button type="button" className="page-button2" onClick={() => navigate(backUrl)}>
-            Annuler
-          </button>
-        </div>
-      </form>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <button className="page-button" type="submit" disabled={loading}>
+              {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
+            </button>
+          </div>
+          <div>
+            <button type="button" className="page-button2" onClick={() => navigate(backUrl)}>
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
 
       {message && <p style={{ color: 'red' }}>{message}</p>}
     </div>

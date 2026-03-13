@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import {
@@ -9,12 +9,14 @@ import {
   getChoirHashtags,
 } from '../../infrastructure/storage/songsService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function SongEditPage() {
   // choirId présent → mode création, songId présent → mode modification
   const { choirId, songId } = useParams();
   const isEditing = !!songId;
   const navigate = useNavigate();
+  const [pageLoading, setPageLoading] = useState(true);
 
   const [title, setTitle] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
@@ -49,6 +51,7 @@ export default function SongEditPage() {
           // Charger tous les hashtags connus de la chorale pour l'autocomplétion
           const known = await getChoirHashtags(data.choir_id);
           setAllHashtags(known);
+          setPageLoading(false);
         } catch (err: any) {
           console.log('Erreur init SongEditPage:', err);
           navigate('/');
@@ -62,6 +65,7 @@ export default function SongEditPage() {
         // Charger tous les hashtags connus de la chorale pour l'autocomplétion
         const known = await getChoirHashtags(choirId!);
         setAllHashtags(known);
+        setPageLoading(false);
       }
     };
     init();
@@ -142,97 +146,91 @@ export default function SongEditPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to={backUrl} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-        </Link>        
-      </div>
-
+      <TopBar />
       <h2>{isEditing ? 'Modifier un chant' : 'Ajouter un chant'}</h2>
 
-      <form onSubmit={handleSubmit}>
-        {/* Titre du chant */}
-        <input
-          type="text"
-          placeholder="Titre du chant"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          className="page-form-input"
-        />
-
-        {/* Saisie des hashtags avec autocomplétion */}
-        <div style={{ position: 'relative', margin: '0.5rem 0' }}>
+      {pageLoading || loading ? <div className="spinner"></div> : (
+        <form onSubmit={handleSubmit}>
+          {/* Titre du chant */}
           <input
             type="text"
-            placeholder="Ajouter un hashtag"
-            value={hashtagInput}
-            onChange={(e) => handleHashtagInput(e.target.value)}
-            onKeyDown={handleHashtagKeyDown}
+            placeholder="Titre du chant"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
             className="page-form-input"
-            style={{ width: '200px' }}
           />
 
-          {/* Liste de suggestions d'autocomplétion */}
-          {suggestions.length > 0 && (
-            <div style={{
-              position: 'absolute', top: '100%', left: 0,
-              backgroundColor: 'white', borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-              overflow: 'hidden', minWidth: '200px', zIndex: 100,
-            }}>
-              {suggestions.map((s) => (
-                <div
-                  key={s}
-                  onClick={() => addHashtag(s)}
-                  style={{
-                    padding: '0.5rem 1rem', fontSize: '0.9rem',
-                    cursor: 'pointer', color: '#222',
-                    borderBottom: '1px solid #eee',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E6F2FF')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-                >
-                  {s}
-                </div>
+          {/* Saisie des hashtags avec autocomplétion */}
+          <div style={{ position: 'relative', margin: '0.5rem 0' }}>
+            <input
+              type="text"
+              placeholder="Ajouter un hashtag"
+              value={hashtagInput}
+              onChange={(e) => handleHashtagInput(e.target.value)}
+              onKeyDown={handleHashtagKeyDown}
+              className="page-form-input"
+              style={{ width: '200px' }}
+            />
+
+            {/* Liste de suggestions d'autocomplétion */}
+            {suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0,
+                backgroundColor: 'white', borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                overflow: 'hidden', minWidth: '200px', zIndex: 100,
+              }}>
+                {suggestions.map((s) => (
+                  <div
+                    key={s}
+                    onClick={() => addHashtag(s)}
+                    style={{
+                      padding: '0.5rem 1rem', fontSize: '0.9rem',
+                      cursor: 'pointer', color: '#222',
+                      borderBottom: '1px solid #eee',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E6F2FF')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                  >
+                    {s}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Hashtags sélectionnés affichés sous forme de pills */}
+          {hashtags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0 1rem 0' }}>
+              {hashtags.map((tag) => (
+                <span key={tag} className="hashtag-pill">
+                  {tag}
+                  {/* Croix pour supprimer le hashtag */}
+                  <span className="hashtag-remove" onClick={() => removeHashtag(tag)}>×</span>
+                </span>
               ))}
             </div>
           )}
-        </div>
 
-        {/* Hashtags sélectionnés affichés sous forme de pills */}
-        {hashtags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0 1rem 0' }}>
-            {hashtags.map((tag) => (
-              <span key={tag} className="hashtag-pill">
-                {tag}
-                {/* Croix pour supprimer le hashtag */}
-                <span className="hashtag-remove" onClick={() => removeHashtag(tag)}>×</span>
-              </span>
-            ))}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <button className="page-button" type="submit" disabled={loading}>
+              {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
+            </button>
           </div>
-        )}
 
-        <div style={{ marginBottom: '0.5rem' }}>
-          <button className="page-button" type="submit" disabled={loading}>
-            {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
-          </button>
-        </div>
-
-        {/* Bouton annuler → retour à la page du chant ou de la chorale */}
-        <div>
-          <button
-            type="button"
-            className="page-button2"
-            onClick={() => navigate(backUrl)}
-          >
-            Annuler
-          </button>
-        </div>
-      </form>
+          {/* Bouton annuler → retour à la page du chant ou de la chorale */}
+          <div>
+            <button
+              type="button"
+              className="page-button2"
+              onClick={() => navigate(backUrl)}
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
 
       {message && <p style={{ color: 'red' }}>{message}</p>}
     </div>

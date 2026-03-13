@@ -1,25 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
+import { useNavigate } from 'react-router-dom';
 import { getChoirByCode } from '../../infrastructure/storage/choirsService';
 import { getEventByCode, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function ChoirJoinPage() {
   const [groups, setGroups] = useState<string[]>(['', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
-
-  // Vérifier si l'utilisateur est connecté au chargement
-  useEffect(() => {
-    getCurrentUser().then((currentUser) => {
-      if (currentUser) setUser(currentUser);
-    });
-  }, []);
 
   // Gestion de la saisie : chiffres uniquement, passage auto au groupe suivant
   const handleChange = (index: number, value: string) => {
@@ -121,62 +113,55 @@ export default function ChoirJoinPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
+      <TopBar />
 
       <h2>Rejoindre une chorale</h2>
       <p>Renseignez le code de la chorale que vous souhaitez rejoindre :</p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '1.5rem 0' }}>
-        {groups.map((g, index) => (
-          <React.Fragment key={index}>
-            <input
-              ref={(el) => { inputs.current[index] = el; }}
-              type="text"
-              inputMode="numeric"
-              maxLength={2}
-              value={g}
-              onChange={(e) => handleChange(index, e.target.value)}
+      {loading ? <div className="spinner"></div> : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '1.5rem 0' }}>
+            {groups.map((g, index) => (
+              <React.Fragment key={index}>
+                <input
+                  ref={(el) => { inputs.current[index] = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={g}
+                  onChange={(e) => handleChange(index, e.target.value)}
+                  onKeyDown={(e) => {
+                    handleKeyDown(index, e);
+                    if (e.key === 'Enter' && groups.join('').length === 8) {
+                      handleJoin();
+                    }
+                  }}
+                  style={{
+                    width: '3rem', height: '2.5rem',
+                    textAlign: 'center', fontSize: '1.2rem',
+                    border: '2px solid #044C8D', borderRadius: '6px',
+                  }}
+                />
+                {index < 3 && <span style={{ fontSize: '1.4rem', color: '#044C8D' }}>-</span>}
+              </React.Fragment>
+            ))}
+          </div>
 
-              onKeyDown={(e) => {
-                handleKeyDown(index, e);
-                // Valider avec Enter si le code est complet (8 chiffres)
-                if (e.key === 'Enter' && groups.join('').length === 8) {
-                  handleJoin();
-                }
-              }}
+          {error && <p style={{ color: 'red' }}>{error}</p>}
 
-              style={{
-                width: '3rem', height: '2.5rem',
-                textAlign: 'center', fontSize: '1.2rem',
-                border: '2px solid #044C8D', borderRadius: '6px',
-              }}
-            />
-            {index < 3 && <span style={{ fontSize: '1.4rem', color: '#044C8D' }}>-</span>}
-          </React.Fragment>
-        ))}
-      </div>
+          <div style={{ margin: '0.5rem 0' }}>
+            <button className="page-button" onClick={handleJoin}>
+              Rejoindre
+            </button>
+          </div>
+          <div>
+            <button className="page-button2" onClick={() => navigate('/')}>
+              Annuler
+            </button>
+          </div>
+        </>
+      )}
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      <div style={{ margin: '0.5rem 0' }}>
-        <button className="page-button" onClick={handleJoin} disabled={loading}>
-          {loading ? 'Recherche...' : 'Rejoindre'}
-        </button>
-      </div>
-      <div>
-        <button className="page-button2" onClick={() => navigate('/')}>
-          Annuler
-        </button>
-      </div>
     </div>
   );
 }

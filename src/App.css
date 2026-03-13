@@ -129,6 +129,9 @@ h3 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0rem;
+  border-bottom: 1px solid #044C8D;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.7rem;
 }
 .navigation {
   font-size: 2rem;

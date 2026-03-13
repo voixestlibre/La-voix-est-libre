@@ -1,22 +1,27 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getEvent } from '../../infrastructure/storage/eventsService';
 import { getStoredEvents, removeStoredEvent } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function LeaveEventPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const [eventName, setEventName] = useState('');
   const [choirId, setChoirId] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const init = async () => {
       // Vérifier si l'utilisateur est connecté
-      const currentUser = await getCurrentUser();
-      if (currentUser) setUser(currentUser);
+      await getCurrentUser();
+
+      // Si l'événement n'est plus dans le localStorage → déjà quitté
+      const stored = getStoredEvents();
+      const found = stored.find((e) => String(e.id) === String(eventId));
+      if (!found) { navigate('/my-choirs', { replace: true }); return; }
 
       try {
         // Récupérer l'événement depuis Supabase
@@ -25,16 +30,11 @@ export default function LeaveEventPage() {
         setChoirId(String(data.choir_id));
       } catch {
         // Fallback offline : chercher dans le localStorage
-        const stored = getStoredEvents();
-        const found = stored.find((e) => String(e.id) === String(eventId));
-        if (found) {
-          setEventName(found.name);
-          setChoirId(String(found.choir_id));
-        } else {
-          // Événement introuvable même en localStorage → retour à la liste
-          navigate('/my-choirs');
-        }
+        setEventName(found.name);
+        setChoirId(String(found.choir_id));
       }
+
+      setLoading(false);
     };
     init();
   }, [eventId, navigate]);
@@ -55,28 +55,24 @@ export default function LeaveEventPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to={`/event/${eventId}`} className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        {user && (
-          <Link to="/login" className="navigation">
-            <i className="fa fa-right-from-bracket"></i>
-          </Link>
-        )}
-      </div>
+      <TopBar />
       <h2>Quitter un événement</h2>
-      <p>Êtes-vous sûr de vouloir quitter l'événement <strong>{eventName}</strong> ?</p>
-      <div style={{ margin: '0.5rem 0' }}>
-        <button className="page-button" onClick={handleLeave}>
-          Confirmer
-        </button>
-      </div>
-      <div>
-        <button className="page-button2" onClick={() => navigate(`/event/${eventId}`)}>
-          Annuler
-        </button>
-      </div>
+
+      {loading ? <div className="spinner"></div> : (
+        <>
+          <p>Êtes-vous sûr de vouloir quitter l'événement <strong>{eventName}</strong> ?</p>
+          <div style={{ margin: '0.5rem 0' }}>
+            <button className="page-button" onClick={handleLeave}>
+              Confirmer
+            </button>
+          </div>
+          <div>
+            <button className="page-button2" onClick={() => navigate(-1)}>
+              Annuler
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

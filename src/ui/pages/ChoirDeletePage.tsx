@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir, deleteChoirCascade } from '../../infrastructure/storage/choirsService';
 import { countChoirSongs } from '../../infrastructure/storage/songsService';
 import { removeStoredChoir, removeStoredEventsByChoirId } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
+import TopBar from '../components/TopBar';
 
 export default function DeleteChoirPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [choirName, setChoirName] = useState('');
   const [songsCount, setSongsCount] = useState(0);
+  const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -29,6 +31,7 @@ export default function DeleteChoirPage() {
         if (String(data.code) === '20398727') {
           setChoirName(data.name);
           setMessage('Cette chorale ne peut pas être supprimée.');
+          setPageLoading(false); 
           return;
         }       
 
@@ -37,8 +40,9 @@ export default function DeleteChoirPage() {
         // Compter les chants rattachés à la chorale
         const count = await countChoirSongs(id!);
         setSongsCount(count);
+        setPageLoading(false);
       } catch {
-        navigate('/');
+        navigate('/my-choirs');
       }
     };
     fetchChoir();
@@ -70,29 +74,26 @@ export default function DeleteChoirPage() {
 
   return (
     <div className="page-container">
-      <div className="top-bar">
-        <Link to="/my-choirs" className="navigation">
-          <i className="fa fa-chevron-left"></i>
-        </Link>
-        <Link to="/login" className="navigation">
-          <i className="fa fa-right-from-bracket"></i>
-        </Link>
-      </div>
+      <TopBar />
       <h2>Supprimer une chorale</h2>
-      <p>{confirmMessage}</p>
-      {!message && (
-        <div style={{ margin: '0.5rem 0' }}>
-          <button className="page-button" onClick={handleDelete} disabled={loading}>
-            {loading ? 'Suppression...' : 'Confirmer'}
-          </button>
-        </div>
+      {pageLoading || loading ? <div className="spinner"></div> : (
+        <>
+          <p>{confirmMessage}</p>
+          {!message && (
+            <div style={{ margin: '0.5rem 0' }}>
+              <button className="page-button" onClick={handleDelete}>
+                Confirmer
+              </button>
+            </div>
+          )}
+          <div>
+            <button className="page-button2" onClick={() => navigate(-1)}>
+              Annuler
+            </button>
+          </div>
+          {message && <p style={{ color: 'red' }}>{message}</p>}
+        </>
       )}
-      <div>
-        <button className="page-button2" onClick={() => navigate('/my-choirs')}>
-          Annuler
-        </button>
-      </div>
-      {message && <p style={{ color: 'red' }}>{message}</p>}
     </div>
   );
 }
