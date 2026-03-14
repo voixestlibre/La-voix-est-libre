@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage/authService';
-import { getStoredEvents, getCachedEvent } from '../../infrastructure/storage/localStorageService';
-import { getCachedFileUrl } from '../../infrastructure/storage/cacheService';
+import { getStoredEvents, setStoredEvents, getCachedEvent } from '../../infrastructure/storage/localStorageService';
+import { getCachedFileUrl, cacheEventFiles, clearEventCache, isCacheable } from '../../infrastructure/storage/cacheService';
 import {
   getSong,
   getSongFiles,
@@ -58,7 +58,12 @@ export default function SongPage() {
   // PDF ouvert sans audio sélectionné, mais des audios sont disponibles
   const [pdfAudioReady, setPdfAudioReady] = useState(false);
 
-
+  // Événement mémorisé auquel ce chant appartient (null si aucun)
+  const [cachedEventId, setCachedEventIdState] = useState<string | null>(null);
+  // Ensemble des noms de fichiers déjà téléchargés pour ce chant
+  const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set());
+  // Progression du téléchargement/suppression en cours
+  const [fileProgress, setFileProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -99,6 +104,26 @@ export default function SongPage() {
         }
   
         await fetchFiles();
+
+        // Vérifier si ce chant appartient à l'événement mémorisé localement
+        const cachedEvent = getCachedEvent();
+        if (cachedEvent && cachedEvent.cached_files) {
+          const songIsInCachedEvent = cachedEvent.cached_files.some(
+            (f) => String(f.songId) === String(songId)
+          );
+          if (songIsInCachedEvent) {
+            setCachedEventIdState(String(cachedEvent.id));
+            // Construire la liste des fichiers déjà téléchargés
+            const downloaded = new Set<string>();
+            for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
+              const publicUrl = getSongFileUrl(String(songId), f.fileName);
+              const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
+              if (cachedUrl) downloaded.add(f.fileName);
+            }
+            setDownloadedFiles(downloaded);
+          }
+        }
+
       } catch {
         // Fallback offline : chercher le chant dans les événements du localStorage
         const matchingEvent = storedEvents.find((e) =>
@@ -265,6 +290,55 @@ export default function SongPage() {
       setMessage(`Erreur lors de la suppression : ${err.message}`);
     }
   };
+
+  // Ajouter ou supprimer un fichier du cache de l'événement mémorisé
+  const handleCacheToggle = async (fileName: string) => {
+    if (!cachedEventId || fileProgress) return;
+
+    const publicUrl = getSongFileUrl(songId!, fileName);
+
+    if (downloadedFiles.has(fileName)) {
+      // Supprimer le fichier du cache Cache API
+      setFileProgress({ done: 0, total: 1 });
+      const cache = await caches.open(`event-files-${cachedEventId}`);
+      await cache.delete(publicUrl);
+
+      // Mettre à jour cached_files dans le localStorage
+      const stored = getStoredEvents();
+      setStoredEvents(stored.map((e) =>
+        String(e.id) === String(cachedEventId)
+          ? { ...e, cached_files: (e.cached_files ?? []).filter(
+              (f) => !(String(f.songId) === String(songId) && f.fileName === fileName)
+            )}
+          : e
+      ));
+
+      // Mettre à jour l'état local
+      setDownloadedFiles((prev) => { const next = new Set(prev); next.delete(fileName); return next; });
+      setFileProgress({ done: 1, total: 1 });
+      setTimeout(() => setFileProgress(null), 500);
+
+    } else {
+      // Télécharger et ajouter le fichier au cache
+      setFileProgress({ done: 0, total: 1 });
+      const response = await fetch(publicUrl);
+      const cache = await caches.open(`event-files-${cachedEventId}`);
+      await cache.put(publicUrl, response);
+
+      // Mettre à jour cached_files dans le localStorage
+      const stored = getStoredEvents();
+      setStoredEvents(stored.map((e) =>
+        String(e.id) === String(cachedEventId)
+          ? { ...e, cached_files: [...(e.cached_files ?? []), { songId: String(songId), fileName }]}
+          : e
+      ));
+
+      // Mettre à jour l'état local
+      setDownloadedFiles((prev) => new Set(prev).add(fileName));
+      setFileProgress({ done: 1, total: 1 });
+      setTimeout(() => setFileProgress(null), 500);
+    }
+  };  
 
   // Déterminer l'icône Font Awesome selon l'extension du fichier
   const getIcon = (fileName: string) => {
@@ -465,30 +539,63 @@ export default function SongPage() {
           {files.length === 0 ? (
             <p>Aucun fichier pour ce chant.</p>
           ) : (
-            <ul className="list-music">
-              {files.map((f) => (
-                <div key={f.name} className="card-music">
-                  <i
-                    className={`fa ${getIcon(f.name)} note`}
-                    onClick={() => handleFileClick(f.name)}
-                    style={{ cursor: 'pointer' }}
-                  ></i>
-                  <div
-                    className="text"
-                    onClick={() => handleFileClick(f.name)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
+            <>
+              {/* Barre de progression téléchargement fichier individuel */}
+              {fileProgress && (
+                <div style={{ marginBottom: '0.8rem' }}>
+                  <div style={{ height: '6px', backgroundColor: '#FDE8ED', borderRadius: '4px' }}>
+                    <div style={{
+                      height: '100%', borderRadius: '4px', backgroundColor: '#DA486D',
+                      width: fileProgress.total > 0 ? `${Math.round((fileProgress.done / fileProgress.total) * 100)}%` : '0%',
+                      transition: 'width 0.3s',
+                    }} />
                   </div>
-                  {isOwner && (
-                    <i
-                      className="fa fa-trash trash"
-                      onClick={() => handleDeleteFile(f.name)}
-                    ></i>
-                  )}
                 </div>
-              ))}
-            </ul>
+              )}
+              <ul className="list-music">
+                {files.map((f) => (
+                  <div key={f.name} className="card-music">
+                    <i
+                      className={`fa ${getIcon(f.name)} note`}
+                      onClick={() => handleFileClick(f.name)}
+                      style={{ cursor: 'pointer' }}
+                    ></i>
+                    <div
+                      className="text"
+                      onClick={() => handleFileClick(f.name)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
+                    </div>
+
+                    {/* Icônes à droite : poubelle (propriétaire) + cache (si événement mémorisé) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+                      {/* Icône cache : affichée uniquement si le chant appartient à l'événement mémorisé
+                          et si le fichier est d'un type téléchargeable */}
+                      {cachedEventId && isCacheable(f.name) && (
+                        <i
+                          className="fa fa-download"
+                          style={{ marginLeft: 0 }}
+                          onClick={() => handleCacheToggle(f.name)}
+                          style={{
+                            fontSize: '1.1rem',
+                            color: downloadedFiles.has(f.name) ? '#044C8D' : '#ccc',
+                            cursor: fileProgress ? 'default' : 'pointer',
+                            marginLeft: 0,
+                            pointerEvents: fileProgress ? 'none' : 'auto',
+                          }}
+                        />
+                      )}
+                      {isOwner && (
+                        <i className="fa fa-trash trash" style={{ marginLeft: 0 }}
+                          onClick={() => handleDeleteFile(f.name)}
+                        ></i>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </ul>
+            </>
           )}
 
           {/* Formulaire ajout fichier (propriétaire uniquement) */}

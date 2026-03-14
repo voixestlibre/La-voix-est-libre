@@ -149,7 +149,7 @@ export default function EventEditPage() {
         const stored = getStoredEvents();
         const updated = stored.map((e) =>
           String(e.id) === String(eventId)
-            ? { ...e, name, songs: songsForStorage }
+            ? { ...e, name, event_date: eventDate, songs: songsForStorage }
             : e
         );
         setStoredEvents(updated);
@@ -167,6 +167,7 @@ export default function EventEditPage() {
           code: String(data.code),
           name: data.name,
           choir_id: data.choir_id,
+          event_date: data.event_date,
           choir_name: null, // sera renseigné au prochain passage sur MyChoirsPage
           songs: songsForStorage,
         }]);
