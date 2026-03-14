@@ -148,7 +148,13 @@ export default function EventPage() {
                   <i className="fa fa-music note"></i>
                   <div
                     className="text"
-                    onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: `/event/${eventId}` } })}
+                    onClick={() => navigate(`/song/${s.id}`, {
+                      state: {
+                        backUrl: `/event/${eventId}`,
+                        // Ordre défini au niveau de l'événement
+                        songList: songs.map((song: any) => song.id),
+                      }
+                    })}                    
                     style={{ cursor: 'pointer' }}
                   >
                     <strong>{s.title}</strong>
