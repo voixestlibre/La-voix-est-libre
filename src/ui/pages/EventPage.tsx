@@ -3,7 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, getEventSongsDetails } from '../../infrastructure/storage/eventsService';
-import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
+import { getCachedEvent, getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
+import { PDFDocument } from 'pdf-lib';
+import { getSongFiles, getSongFileUrl } from '../../infrastructure/storage/songsService';
+import { getCachedFileUrl } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 
@@ -16,6 +19,97 @@ export default function EventPage() {
   const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDirectEventMember, setIsDirectEventMember] = useState(false);
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  // Fonction permettant de générer un fichier pdf global
+  const handleGenerateLivret = async () => {
+    setIsGeneratingPdf(true);
+    setPdfProgress({ done: 0, total: songs.length });
+    setPdfError(null);
+  
+    try {
+      const mergedPdf = await PDFDocument.create();
+      let totalPdfCount = 0;
+      const cachedEvent = getCachedEvent();
+      const isThisEventCached = cachedEvent && String(cachedEvent.id) === String(eventId);
+  
+      for (let i = 0; i < songs.length; i++) {
+        const song = songs[i];
+        setPdfProgress({ done: i, total: songs.length });
+  
+        try {
+          // Récupérer les fichiers du chant
+          let pdfFiles: { name: string }[] = [];
+  
+          if (isThisEventCached && cachedEvent?.cached_files) {
+            // Offline : utiliser les fichiers du cache
+            pdfFiles = cachedEvent.cached_files
+              .filter((f) => String(f.songId) === String(song.id) && f.fileName.toLowerCase().endsWith('.pdf'))
+              .map((f) => ({ name: f.fileName }));
+          } else {
+            // Online : récupérer depuis Supabase
+            const allFiles = await getSongFiles(String(song.id));
+            pdfFiles = allFiles.filter((f: any) => f.name.toLowerCase().endsWith('.pdf'));
+          }
+  
+          // Traiter chaque PDF du chant dans l'ordre
+          for (const pdfFile of pdfFiles) {
+            try {
+              let pdfBytes: ArrayBuffer;
+  
+              if (isThisEventCached && cachedEvent) {
+                // Offline : récupérer depuis le cache
+                const publicUrl = getSongFileUrl(String(song.id), pdfFile.name);
+                const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
+                const url = cachedUrl ?? publicUrl;
+                pdfBytes = await fetch(url).then((r) => r.arrayBuffer());
+              } else {
+                // Online : récupérer depuis Supabase
+                const url = getSongFileUrl(String(song.id), pdfFile.name);
+                pdfBytes = await fetch(url).then((r) => r.arrayBuffer());
+              }
+  
+              // Copier les pages dans le document fusionné
+              const srcDoc = await PDFDocument.load(pdfBytes);
+              const pages = await mergedPdf.copyPages(srcDoc, srcDoc.getPageIndices());
+              pages.forEach((page) => mergedPdf.addPage(page));
+              totalPdfCount++;
+            } catch {
+              // Fichier PDF inaccessible → on le saute silencieusement
+            }
+          }
+        } catch {
+          // Chant inaccessible → on le saute silencieusement
+        }
+      }
+  
+      setPdfProgress({ done: songs.length, total: songs.length });
+  
+      if (totalPdfCount === 0) {
+        setPdfError('Aucun fichier PDF disponible pour cet événement.');
+        return;
+      }
+  
+      // Générer et télécharger le PDF final
+      const pdfBytes = await mergedPdf.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${event.name}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+  
+    } catch (err: any) {
+      setPdfError(`Erreur lors de la génération : ${err.message}`);
+    } finally {
+      setIsGeneratingPdf(false);
+      setPdfProgress(null);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -183,6 +277,43 @@ export default function EventPage() {
                 <i className="fa fa-sign-out"></i> &nbsp;
                 Quitter l'événement
               </button>
+            </div>
+          )}
+
+          {/* Bouton livret PDF — visible pour tous */}
+          {songs.length > 0 && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <button
+                className="page-button pink"
+                onClick={handleGenerateLivret}
+                disabled={isGeneratingPdf}
+              >
+                <i className="fa fa-file-pdf"></i> &nbsp;
+                {isGeneratingPdf ? 'Génération...' : 'Télécharger le livret PDF'}
+              </button>
+
+              {/* Barre de progression */}
+              {isGeneratingPdf && pdfProgress && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#DA486D', margin: '0 0 0.3rem 0' }}>
+                    Traitement : {pdfProgress.done} / {pdfProgress.total} chants
+                  </p>
+                  <div style={{ height: '6px', backgroundColor: '#FDE8ED', borderRadius: '4px' }}>
+                    <div style={{
+                      height: '100%', borderRadius: '4px', backgroundColor: '#DA486D',
+                      width: pdfProgress.total > 0
+                        ? `${Math.round((pdfProgress.done / pdfProgress.total) * 100)}%`
+                        : '0%',
+                      transition: 'width 0.3s',
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Message d'erreur */}
+              {pdfError && (
+                <p style={{ color: '#DA486D', fontSize: '0.9rem', marginTop: '0.5rem' }}>{pdfError}</p>
+              )}
             </div>
           )}
 
