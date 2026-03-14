@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { getEvent, deleteEvent } from '../../infrastructure/storage/eventsService';
-import { removeStoredEvent } from '../../infrastructure/storage/localStorageService';
+import { removeStoredEvent, getCachedEvent, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
+import { clearEventCache } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 
@@ -57,6 +58,13 @@ export default function EventDeletePage() {
       // Supprimer l'événement du localStorage
       // (pour tous les utilisateurs qui l'auraient rejoint)
       removeStoredEvent(eventId!);
+
+      // Supprimer le cache si cet événement était mémorisé
+      const cachedEvent = getCachedEvent();
+      if (cachedEvent && String(cachedEvent.id) === String(eventId)) {
+        await clearEventCache(eventId!);
+        clearCachedEventId();
+      }
 
       navigate(`/choir/${event.choir_id}`);
     } catch (err: any) {

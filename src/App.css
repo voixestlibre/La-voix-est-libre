@@ -109,6 +109,16 @@ h3 {
   border: 2px solid #044C8D;
 }
 
+.page-button2.pink {
+  color: #DA486D;
+  border: 2px solid #DA486D;
+}
+.page-button2.pink:hover {
+  color: #ffffff;
+  background-color: #DA486D;
+  border: 2px solid #DA486D;
+}
+
 
 /* Formulaires */
 .page-form-input {

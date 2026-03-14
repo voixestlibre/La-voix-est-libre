@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage/authService';
-import { getStoredEvents } from '../../infrastructure/storage/localStorageService';
+import { getStoredEvents, getCachedEvent } from '../../infrastructure/storage/localStorageService';
+import { getCachedFileUrl } from '../../infrastructure/storage/cacheService';
 import {
   getSong,
   getSongFiles,
@@ -21,6 +22,7 @@ import TopBar from '../components/TopBar';
 export default function SongPage() {
   const { songId } = useParams();
   const navigate = useNavigate();
+  const [isOffline, setIsOffline] = useState(false);
   const [song, setSong] = useState<any>(null);
   const [files, setFiles] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
@@ -118,7 +120,35 @@ export default function SongPage() {
           });
         }
   
-        setFiles([]);
+        // Fallback offline : chercher les fichiers PDF dans le cache
+        const cachedEvent = getCachedEvent();
+        if (cachedEvent && String(cachedEvent.id) === String(matchingEvent.id) && cachedEvent.cached_files) {
+          const offlineFiles: { name: string }[] = [];
+          for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
+            const publicUrl = getSongFileUrl(String(songId), f.fileName);
+            const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
+            if (cachedUrl) offlineFiles.push({ name: f.fileName });
+          }
+
+          // Trier comme en online : PDF d'abord, puis audio, alphabétique dans chaque groupe
+          offlineFiles.sort((a, b) => {
+            const extA = a.name.split('.').pop()?.toLowerCase() || '';
+            const extB = b.name.split('.').pop()?.toLowerCase() || '';
+            const isAudioA = ['mp3', 'wav', 'ogg', 'm4a'].includes(extA);
+            const isAudioB = ['mp3', 'wav', 'ogg', 'm4a'].includes(extB);
+            if (isAudioA !== isAudioB) return isAudioA ? 1 : -1;
+            const nameA = a.name.split('.').slice(0, -1).join('.');
+            const nameB = b.name.split('.').slice(0, -1).join('.');
+            return nameA.localeCompare(nameB);
+          });
+
+          setFiles(offlineFiles);
+          setIsOffline(true);
+
+        } else {
+          setFiles([]);
+        }
+
       }
   
       setLoading(false);
@@ -256,8 +286,16 @@ export default function SongPage() {
     fileName.split('.').pop()?.toLowerCase() === 'pdf';
 
   // Ouvrir un fichier selon son type
-  const handleFileClick = (fileName: string) => {
-    const url = getPublicUrl(fileName);
+  const handleFileClick = async (fileName: string) => {
+    let url: string;
+    if (isOffline) {
+      const cachedEvent = getCachedEvent();
+      const publicUrl = getSongFileUrl(songId!, fileName);
+      url = (await getCachedFileUrl(String(cachedEvent!.id), publicUrl)) ?? publicUrl;
+    } else {
+      url = getPublicUrl(fileName);
+    }
+
     if (isPdf(fileName)) {
       setPdfUrl(url);
       // Si pas d'audio en cours mais qu'il y en a de disponibles, préparer le bouton note

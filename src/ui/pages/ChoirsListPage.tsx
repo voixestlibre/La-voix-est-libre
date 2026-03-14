@@ -195,6 +195,8 @@ export default function MyChoirsPage() {
             choir_id: ev.choir_id,
             choir_name: choir ? choir.name : (existingEvent?.choir_name ?? null),
             songs,
+            is_cached: existingEvent?.is_cached ?? false,      
+            cached_files: existingEvent?.cached_files ?? [],
           };
         }));
         setStoredEvents(updatedEvents);

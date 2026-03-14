@@ -263,27 +263,51 @@ export default function ChoirPage() {
                         <span>Code : {formatCode(String(ev.code))}</span>
                       </div>
 
-                      {/* Icône quitter : uniquement si l'événement a été rejoint directement
-                          (pas via la chorale) — les membres explicites ne peuvent pas quitter
-                          un événement individuellement */}
-                      {isOwner ? (
-                        <i
-                          className="fa fa-trash trash"
-                          onClick={() => navigate(`/delete-event/${ev.id}`)}
-                        ></i>
-                      ) : isDelegate && userParamId !== null && ev.created_by === userParamId ? (
-                        // Délégué : peut supprimer les événements qu'il a créés
-                        <i
-                          className="fa fa-trash trash"
-                          onClick={() => navigate(`/delete-event/${ev.id}`)}
-                        ></i>
-                      ) : !isFullMember ? (
-                        // Membre fantôme : a rejoint l'événement directement → peut le quitter
-                        <i
-                          className="fa fa-sign-out trash"
-                          onClick={() => navigate(`/leave-event/${ev.id}`)}
-                        ></i>
-                      ) : null /* Membre explicite : voit tous les events via la chorale → pas d'icône quitter */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+                        {/* Icône quitter : uniquement si l'événement a été rejoint directement
+                            (pas via la chorale) — les membres explicites ne peuvent pas quitter
+                            un événement individuellement */}
+                        {isOwner ? (
+                          <i
+                            className="fa fa-trash trash"
+                            style={{ marginLeft: 0 }}
+                            onClick={() => navigate(`/delete-event/${ev.id}`)}
+                          ></i>
+                        ) : isDelegate && userParamId !== null && ev.created_by === userParamId ? (
+                          // Délégué : peut supprimer les événements qu'il a créés
+                          <i
+                            className="fa fa-trash trash"
+                            style={{ marginLeft: 0 }}
+                            onClick={() => navigate(`/delete-event/${ev.id}`)}
+                          ></i>
+                        ) : !isFullMember ? (
+                          // Membre fantôme : a rejoint l'événement directement → peut le quitter
+                          <i
+                            className="fa fa-sign-out trash"
+                            style={{ marginLeft: 0 }}
+                            onClick={() => navigate(`/leave-event/${ev.id}`)}
+                          ></i>
+                        ) : null /* Membre explicite : voit tous les events via la chorale → pas d'icône quitter */}
+
+                        {/* Icône offline : bleue si mémorisé, grise sinon → redirige vers my-events */}
+                        {(() => {
+                          const isCached = getStoredEvents().find(
+                            (se) => String(se.id) === String(ev.id)
+                          )?.is_cached ?? false;
+                          return (
+                            <i
+                              className="fa fa-download"
+                              onClick={(e) => { e.stopPropagation(); navigate('/my-events'); }}
+                              style={{
+                                fontSize: '1.1rem',
+                                color: isCached ? '#044C8D' : '#ccc',
+                                cursor: 'pointer',
+                                marginLeft: '0.5rem',
+                              }}
+                            />
+                          );
+                        })()}
+                      </div>
 
                     </div>
                   ))}
