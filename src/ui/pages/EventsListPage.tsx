@@ -1,7 +1,7 @@
   import { useState, useEffect } from 'react';
   import { useNavigate } from 'react-router-dom';
   import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
-  import { getEventsByChoirIds, getEventsByCodes } from '../../infrastructure/storage/eventsService';
+  import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
   import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
   import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
   import { cacheEventFiles, clearEventCache } from '../../infrastructure/storage/cacheService';
@@ -15,12 +15,15 @@
     newEventName: string;
     newSongIds: string[];
     replacingName: string | null; // null = premier enregistrement
+    fileCount: number;
+    totalSizeKb: number;    
   };
 
   export default function MyEventsPage() {
     const [events, setEvents] = useState<any[]>([]);
     const [ownedChoirIds, setOwnedChoirIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [collecting, setCollecting] = useState(false);
     const [confirmBanner, setConfirmBanner] = useState<ConfirmBanner | null>(null);
     const [downloading, setDownloading] = useState(false);
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -79,8 +82,8 @@
             });
           }
 
-          // Mettre à jour le localStorage
-          setStoredEvents(allValidEvents.map((ev) => {
+          // Mettre à jour le localStorage avec les chants à jour pour chaque événement
+          const updatedStoredEvents = await Promise.all(allValidEvents.map(async (ev) => {
             const existing = storedEvents.find((e) => String(e.code) === String(ev.code));
             return {
               id: String(ev.id),
@@ -88,11 +91,14 @@
               name: ev.name,
               choir_id: ev.choir_id,
               choir_name: ev.choir_name,
-              songs: existing?.songs ?? [],
+              // Charger les chants depuis Supabase, fallback sur le localStorage si erreur
+              songs: await getEventSongsTitles(String(ev.id)).catch(() => existing?.songs ?? []),
               is_cached: existing?.is_cached ?? false,
               cached_files: existing?.cached_files ?? [],
+              event_date: ev.event_date ?? existing?.event_date ?? null,
             };
           }));
+          setStoredEvents(updatedStoredEvents);
 
           // Nettoyage : si l'événement mémorisé n'existe plus dans la liste valide → supprimer le cache
           const cachedEvent = getCachedEvent();
@@ -118,25 +124,55 @@
     }, []);
 
     // Clic sur l'icône download → afficher la bannière de confirmation
-    const handleOfflineClick = (eventId: string, eventName: string, songIds: string[]) => {
+    const handleOfflineClick = async (eventId: string, eventName: string, songIds: string[]) => {
       const alreadyCached = getCachedEvent();
-
-      // Si cet événement est déjà mémorisé → désactiver (avec confirmation)
+    
+      // Si cet événement est déjà mémorisé → désactiver (avec confirmation, sans infos fichiers)
       if (alreadyCached && String(alreadyCached.id) === String(eventId)) {
         setConfirmBanner({
           newEventId: eventId,
           newEventName: eventName,
           newSongIds: songIds,
-          replacingName: eventName, // on réutilise replacingName pour signaler "désactiver"
+          replacingName: eventName,
+          fileCount: 0,
+          totalSizeKb: 0,
         });
         return;
       }
-
+    
+      // Collecter les fichiers téléchargeables pour afficher les infos dans la bannière
+      let fileCount = 0;
+      let totalSizeKb = 0;
+      setCollecting(true);
+      try {
+        for (const songId of songIds) {
+          const files = await getSongFiles(songId);
+          for (const f of files) {
+            if (isCacheable(f.name)) {
+              fileCount++;
+              // Récupérer la taille via une requête HEAD
+              try {
+                const res = await fetch(getSongFileUrl(songId, f.name), { method: 'HEAD' });
+                const size = res.headers.get('content-length');
+                if (size) totalSizeKb += Math.round(parseInt(size) / 1024);
+              } catch {
+                // Taille non disponible → on ignore
+              }
+            }
+          }
+        }
+      } catch {
+        // Erreur réseau → on affiche quand même la bannière sans les infos
+      }
+      setCollecting(false);
+    
       setConfirmBanner({
         newEventId: eventId,
         newEventName: eventName,
         newSongIds: songIds,
         replacingName: alreadyCached?.name ?? null,
+        fileCount,
+        totalSizeKb,
       });
     };
 
@@ -149,6 +185,7 @@
       setConfirmBanner(null);
 
       if (isDeactivating) {
+        // Désactivation : supprimer le cache et démarquer l'événement
         await clearEventCache(newEventId);
         clearCachedEventId();
         // Rafraîchir l'affichage
@@ -156,17 +193,20 @@
         return;
       }
 
-      // Supprimer l'ancien cache si nécessaire
-      if (alreadyCached) {
-        await clearEventCache(String(alreadyCached.id));
-        clearCachedEventId();
+      // Supprimer tous les caches de tous les événements connus
+      // (nettoyage complet pour éviter tout fichier orphelin)
+      const allStoredEvents = getStoredEvents();
+      for (const ev of allStoredEvents) {
+        await clearEventCache(String(ev.id));
       }
+      clearCachedEventId();
 
       // Lancer le téléchargement
       setDownloading(true);
       setProgress({ done: 0, total: 0 });
 
       try {
+        // Collecter tous les fichiers PDF de tous les chants de l'événement
         const allFiles: { name: string; url: string; songId: string }[] = [];
         for (const songId of newSongIds) {
           const files = await getSongFiles(songId);
@@ -179,10 +219,12 @@
 
         setProgress({ done: 0, total: allFiles.length });
 
+        // Télécharger et mettre en cache tous les fichiers
         await cacheEventFiles(newEventId, allFiles, (done, total) => {
           setProgress({ done, total });
         });
 
+        // Marquer l'événement comme mémorisé dans le localStorage
         setCachedEventId(newEventId);
 
         // Sauvegarder les noms de fichiers dans le localStorage
@@ -216,13 +258,21 @@
         <TopBar />
         <h2>Mes événements</h2>
 
+        {/* Indicateur de collecte des infos fichiers */}
+        {collecting && (
+          <p style={{ fontSize: '0.85rem', color: '#DA486D', margin: '0 0 0.5rem 0' }}>
+            <i className="fa fa-spinner fa-spin" style={{ marginRight: '0.4rem' }}></i>
+            Analyse des fichiers...
+          </p>
+        )}
+
         {/* Bannière de confirmation inline */}
         {confirmBanner && (
           <div style={{
             backgroundColor: '#FDE8ED', border: '1px solid #DA486D',
             borderRadius: '8px', padding: '0.8rem 1rem', marginBottom: '1rem',
           }}>
-            <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.95rem' }}>
+            <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem' }}>
               {isDeactivating(confirmBanner.newEventId)
                 ? <>Souhaitez-vous supprimer les fichiers mémorisés de <strong>{confirmBanner.newEventName}</strong> ?</>
                 : confirmBanner.replacingName
@@ -230,10 +280,31 @@
                 : <>Souhaitez-vous mémoriser les fichiers de <strong>{confirmBanner.newEventName}</strong> pour une utilisation hors ligne ?</>
               }
             </p>
+            {/* Infos fichiers : affichées uniquement pour les actions de mémorisation */}
+            {!isDeactivating(confirmBanner.newEventId) && (
+              <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.85rem', color: '#888' }}>
+                {confirmBanner.fileCount === 0
+                  ? 'Aucun fichier téléchargeable.'
+                  : <>
+                      Nombre de fichiers : <strong>{confirmBanner.fileCount}</strong>
+                      {confirmBanner.totalSizeKb > 0 && (
+                        <> &nbsp;·&nbsp; Taille totale : <strong>
+                          {confirmBanner.totalSizeKb >= 1024
+                            ? `${(confirmBanner.totalSizeKb / 1024).toFixed(1)} Mo`
+                            : `${confirmBanner.totalSizeKb} Ko`}
+                        </strong></>
+                      )}
+                    </>
+                }
+              </p>
+            )}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="page-button pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleConfirm}>
-                Confirmer
-              </button>
+              {/* Bouton Confirmer masqué si aucun fichier téléchargeable */}
+              {(isDeactivating(confirmBanner.newEventId) || confirmBanner.fileCount > 0) && (
+                <button className="page-button pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleConfirm}>
+                  Confirmer
+                </button>
+              )}
               <button className="page-button2 pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleCancel}>
                 Annuler
               </button>
@@ -317,9 +388,9 @@
                       style={{
                         fontSize: '1.1rem',
                         color: isCached ? '#044C8D' : '#ccc',
-                        cursor: downloading ? 'default' : 'pointer',
+                        cursor: (downloading || collecting) ? 'default' : 'pointer',
                         marginLeft: '0.5rem',
-                        pointerEvents: downloading ? 'none' : 'auto',
+                        pointerEvents: (downloading || collecting) ? 'none' : 'auto',
                       }}
                     />
                   </div>

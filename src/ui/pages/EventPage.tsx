@@ -92,8 +92,7 @@ export default function EventPage() {
             name: storedEvent.name,
             code: storedEvent.code,
             choir_id: storedEvent.choir_id,
-            // event_date non disponible en localStorage → sera null
-            event_date: null,
+            event_date: storedEvent.event_date ?? null,
           });
           // Chants disponibles offline grâce au cache localStorage
           setSongs(storedEvent.songs ?? []);
