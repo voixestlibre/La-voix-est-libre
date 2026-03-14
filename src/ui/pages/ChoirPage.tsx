@@ -459,7 +459,16 @@ export default function ChoirPage() {
                           marginRight: '1rem',
                         }}
                       ></i>
-                      <div className="text" onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: `/choir/${id}` } })} style={{ cursor: 'pointer' }}>
+                      <div className="text" 
+                        onClick={() => navigate(`/song/${s.id}`, {
+                          state: {
+                            backUrl: `/choir/${id}`,
+                            // Liste ordonnée des ids après filtres — permet le swipe dans SongPage
+                            songList: filteredSongs.map((s) => s.id),
+                          }
+                        })}                        
+                        style={{ cursor: 'pointer' }}
+                        >
                         <strong>{s.title}</strong>
                         {s.hashtags?.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
@@ -507,7 +516,16 @@ export default function ChoirPage() {
                                 marginRight: '1rem',
                               }}
                             ></i>
-                            <div className="text" onClick={() => navigate(`/song/${s.id}`, { state: { backUrl: `/choir/${id}` } })} style={{ cursor: 'pointer' }}>
+                            <div className="text" 
+                              onClick={() => navigate(`/song/${s.id}`, {
+                                state: {
+                                  backUrl: `/choir/${id}`,
+                                  // Liste ordonnée des ids après filtres — permet le swipe dans SongPage
+                                  songList: getGroupedSongs(filteredSongs).flatMap((g) => g.songs.map((s) => s.id)),
+                                }
+                              })}
+                              style={{ cursor: 'pointer' }}
+                              >
                               <strong>{s.title}</strong>
                             </div>
                             {/* Icône delete — propriétaire uniquement */}
