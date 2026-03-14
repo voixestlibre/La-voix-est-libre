@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getEvent } from '../../infrastructure/storage/eventsService';
-import { getStoredEvents, removeStoredEvent } from '../../infrastructure/storage/localStorageService';
+import { getStoredEvents, removeStoredEvent, getCachedEvent, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
+import { clearEventCache } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 
@@ -39,7 +40,14 @@ export default function LeaveEventPage() {
     init();
   }, [eventId, navigate]);
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
+    // Supprimer le cache si cet événement était mémorisé
+    const cachedEvent = getCachedEvent();
+    if (cachedEvent && String(cachedEvent.id) === String(eventId)) {
+      await clearEventCache(eventId!);
+      clearCachedEventId();
+    }
+
     // Supprimer l'événement du localStorage
     removeStoredEvent(eventId!);
 
