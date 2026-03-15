@@ -197,3 +197,13 @@ export async function getEventSongsTitles(eventId: string): Promise<{ id: string
     .map((id: string) => songs.find((s: any) => s.id === id))
     .filter(Boolean);
 }
+
+
+// Modifier l'activité d'un évènement
+export async function toggleEventActive(eventId: string, active: boolean) {
+  const { error } = await supabase
+    .from('events')
+    .update({ active })
+    .eq('id', parseInt(eventId, 10));
+  if (error) throw error;
+}

@@ -145,7 +145,7 @@ export default function EventEditPage() {
         // Mettre à jour l'événement en base
         await updateEvent(eventId!, name, eventDate);
         await setEventSongs(eventId!, selectedSongIds);
-          
+        
         const stored = getStoredEvents();
         const updated = stored.map((e) =>
           String(e.id) === String(eventId)
@@ -184,6 +184,7 @@ export default function EventEditPage() {
   const normalize = (str: string) =>
     str.replace(/œ/g, 'oe').replace(/Œ/g, 'oe').replace(/æ/g, 'ae').replace(/Æ/g, 'ae')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/,/g, ' ').replace(/\s+/g, ' ').trim()
       .toLowerCase();
 
   const getGroupedSongs = (songs: any[]) => {

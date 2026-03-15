@@ -1,7 +1,7 @@
   import { useState, useEffect } from 'react';
   import { useNavigate } from 'react-router-dom';
   import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
-  import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
+  import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles, toggleEventActive } from '../../infrastructure/storage/eventsService';
   import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
   import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
   import { cacheEventFiles, clearEventCache } from '../../infrastructure/storage/cacheService';
@@ -96,6 +96,7 @@
               is_cached: existing?.is_cached ?? false,
               cached_files: existing?.cached_files ?? [],
               event_date: ev.event_date ?? existing?.event_date ?? null,
+              active: ev.active ?? existing?.active ?? true,
             };
           }));
           setStoredEvents(updatedStoredEvents);
@@ -123,6 +124,16 @@
       fetchData();
     }, []);
 
+    const handleToggleEventActive = async (eventId: string, current: boolean) => {
+      try {
+        await toggleEventActive(eventId, !current);
+        // Mettre à jour le state local
+        setEvents((prev) =>
+          prev.map((ev) => String(ev.id) === String(eventId) ? { ...ev, active: !current } : ev)
+        );
+      } catch {}
+    };    
+
     // Clic sur l'icône download → afficher la bannière de confirmation
     const handleOfflineClick = async (eventId: string, eventName: string, songIds: string[]) => {
       const alreadyCached = getCachedEvent();
@@ -139,7 +150,21 @@
         });
         return;
       }
-    
+
+      // Bloquer le téléchargement si l'événement est inactif
+      const eventData = events.find((ev) => String(ev.id) === String(eventId));
+      if (eventData && eventData.active === false) {
+        setConfirmBanner({
+          newEventId: eventId,
+          newEventName: eventName,
+          newSongIds: [],
+          replacingName: null,
+          fileCount: -1, // valeur sentinelle pour signaler "événement inactif"
+          totalSizeKb: 0,
+        });
+        return;
+      }
+
       // Collecter les fichiers téléchargeables pour afficher les infos dans la bannière
       let fileCount = 0;
       let totalSizeKb = 0;
@@ -281,9 +306,12 @@
               }
             </p>
             {/* Infos fichiers : affichées uniquement pour les actions de mémorisation */}
+
             {!isDeactivating(confirmBanner.newEventId) && (
-              <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.85rem', color: '#888' }}>
-                {confirmBanner.fileCount === 0
+              <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.85rem', color: '#DA486D' }}>
+                {confirmBanner.fileCount === -1
+                  ? 'Cet événement est inactif — le téléchargement n\'est pas disponible.'
+                  : confirmBanner.fileCount === 0
                   ? 'Aucun fichier téléchargeable.'
                   : <>
                       Nombre de fichiers : <strong>{confirmBanner.fileCount}</strong>
@@ -298,6 +326,7 @@
                 }
               </p>
             )}
+
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {/* Bouton Confirmer masqué si aucun fichier téléchargeable */}
               {(isDeactivating(confirmBanner.newEventId) || confirmBanner.fileCount > 0) && (
@@ -344,17 +373,46 @@
 
               return (
                 <div key={e.id} className="card-music pink">
-                  <i className="fa fa-calendar-days note"></i>
+                  {/* Icône calendrier : rose si actif, grise si inactif
+                      Cliquable uniquement par propriétaire ou délégué créateur */}
+                  <i
+                    className="fa fa-calendar-days note"
+                    onClick={() => {
+                      const isOwner = ownedChoirIds.includes(String(e.choir_id));
+                      const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
+                      const isCreator = userParamId !== null && e.created_by === userParamId;
+                      const canToggle = isOwner || (isDelegate && isCreator);
+                      if (canToggle) handleToggleEventActive(String(e.id), e.active ?? true);
+                    }}
+                    style={{
+                      color: (e.active ?? true) ? '#DA486D' : '#ccc',
+                      cursor: (() => {
+                        const isOwner = ownedChoirIds.includes(String(e.choir_id));
+                        const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
+                        const isCreator = userParamId !== null && e.created_by === userParamId;
+                        return (isOwner || (isDelegate && isCreator)) ? 'pointer' : 'default';
+                      })(),
+                    }}
+                  />
+                  
                   <div
                     className="text"
                     onClick={() => navigate(`/event/${e.id}`)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <strong>{e.name}</strong>
+                    <strong style={{ color: (e.active ?? true) ? undefined : '#aaa' }}>{e.name}</strong>
                     <div style={{ paddingLeft: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', marginTop: '0.2rem' }}>
-                      {e.choir_name && <span style={{ fontSize: '0.85rem' }}>Chorale : {e.choir_name}</span>}
-                      {e.event_date && <span style={{ fontSize: '0.85rem' }}>Date : {new Date(e.event_date).toLocaleDateString('fr-FR')}</span>}
-                      <span style={{ fontSize: '0.85rem' }}>Code : {formatCode(String(e.code))}</span>
+                      {e.choir_name && (
+                        <span
+                          onClick={(ev) => { ev.stopPropagation(); navigate(`/choir/${e.choir_id}`); }}
+                          style={{ fontSize: '0.85rem', color: (e.active ?? true) ? '#FB8917' : '#aaa', cursor: 'pointer' }}
+                        >
+                          <i className="fa fa-users" style={{ marginRight: '0.4rem' }}></i>
+                          {e.choir_name}
+                        </span>
+                      )}
+                      {e.event_date && <span style={{ fontSize: '0.85rem', color: (e.active ?? true) ? undefined : '#aaa' }}>Date : {new Date(e.event_date).toLocaleDateString('fr-FR')}</span>}
+                      <span style={{ fontSize: '0.85rem', color: (e.active ?? true) ? undefined : '#aaa' }}>Code : {formatCode(String(e.code))}</span>
                     </div>
                   </div>
 
@@ -368,19 +426,11 @@
                       const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
                       const isCreator = userParamId !== null && e.created_by === userParamId;
                       const isFullMember = isOwner || explicitChoirIds.includes(String(e.choir_id));
-
-                      if (isOwner) {
-                        return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)}></i>;
-                      }
-                      if (isDelegate && isCreator) {
-                        return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)}></i>;
-                      }
-                      if (!isFullMember) {
-                        return <i className="fa fa-sign-out trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/leave-event/${e.id}`)}></i>;
-                      }
+                      if (isOwner) return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)} />;
+                      if (isDelegate && isCreator) return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)} />;
+                      if (!isFullMember) return <i className="fa fa-sign-out trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/leave-event/${e.id}`)} />;
                       return null;
                     })()}
-
                     {/* Icône offline — toujours affichée */}
                     <i
                       className="fa fa-download"
@@ -394,7 +444,6 @@
                       }}
                     />
                   </div>
-
                 </div>
               );
             })}

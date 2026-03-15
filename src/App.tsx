@@ -19,6 +19,7 @@ import EventsListPage from './ui/pages/EventsListPage';
 import LoginPage from './ui/pages/LoginPage';
 import ResetRequestPage from './ui/pages/ResetRequestPage';
 import ResetPasswordPage from './ui/pages/ResetPasswordPage';
+import UserCreatePage from './ui/pages/UserCreatePage';
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-request" element={<ResetRequestPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/create-user" element={<UserCreatePage />} />
       </Routes>
     </BrowserRouter>
   );

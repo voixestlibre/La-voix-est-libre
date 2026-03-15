@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../infrastructure/storage/supabaseClient';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
+import { isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 
 interface TopBarProps {
   backUrl?: string;
@@ -15,14 +16,20 @@ export default function TopBar({ backUrl }: TopBarProps) {
   const [hasChoirs, setHasChoirs] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       const currentUser = data.session?.user ?? null;
       setUser(currentUser);
       const hasStoredChoirs = getStoredChoirs().length > 0;
       const hasStoredEvents = getStoredEvents().length > 0;
       setHasChoirs(!!currentUser || hasStoredChoirs || hasStoredEvents);
+      // Vérifier si l'utilisateur est admin
+      if (currentUser) {
+        const admin = await isCurrentUserAdmin();
+        setIsAdmin(admin);
+      }      
     });
   }, []);
 
@@ -45,10 +52,11 @@ export default function TopBar({ backUrl }: TopBarProps) {
   };
 
   const menuItems = [
-    { label: 'Home',                  icon: 'fa-house',              path: '/',            always: true  },
-    { label: 'Mes chorales',          icon: 'fa-people-group',       path: '/my-choirs',   always: false },
-    { label: 'Rejoindre une chorale', icon: 'fa-circle-plus',   path: '/join-choir',  always: true  },
-  ].filter(item => item.always || hasChoirs);
+    { label: 'Home',                  icon: 'fa-house',         path: '/',             always: true  },
+    { label: 'Mes chorales',          icon: 'fa-people-group',  path: '/my-choirs',    always: false },
+    { label: 'Rejoindre une chorale', icon: 'fa-circle-plus',   path: '/join-choir',   always: true  },
+    { label: 'Créer un utilisateur',  icon: 'fa-user-plus',     path: '/create-user',  always: false, adminOnly: true },
+  ].filter(item => (item.always || hasChoirs) && (!item.adminOnly || isAdmin));
 
   return (
     <div className="top-bar">
