@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
 import { getStoredChoirs, setStoredChoirs, removeStoredEventsByChoirId } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
@@ -10,14 +9,10 @@ export default function LeaveChoirPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [choirName, setChoirName] = useState('');
-  const [choirCode, setChoirCode] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const init = async () => {
-      // Vérifier si l'utilisateur est connecté
-      const currentUser = await getCurrentUser();
-
       // Vérifier si la chorale est encore dans le localStorage
       // Si elle n'y est plus, c'est qu'elle a déjà été quittée → redirection
       const stored = getStoredChoirs();
@@ -27,11 +22,9 @@ export default function LeaveChoirPage() {
       try {
         const data = await getChoir(id!);
         setChoirName(data.name);
-        setChoirCode(String(data.code));
       } catch {
         // Fallback offline
         setChoirName(found.name);
-        setChoirCode(found.code);
       }
       setLoading(false); 
     };

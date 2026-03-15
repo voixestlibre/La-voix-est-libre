@@ -195,7 +195,7 @@ export async function getEventSongsTitles(eventId: string): Promise<{ id: string
   // Réordonner selon l'ordre de l'événement (l'étape 2 ne garantit pas l'ordre)
   return songIds
     .map((id: string) => songs.find((s: any) => s.id === id))
-    .filter(Boolean);
+    .filter((s): s is { id: string; title: string } => !!s);
 }
 
 

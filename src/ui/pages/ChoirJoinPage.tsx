@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChoirByCode } from '../../infrastructure/storage/choirsService';
 import { getEventByCode, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
@@ -43,6 +43,9 @@ export default function ChoirJoinPage() {
       // ── Essayer d'abord comme code de chorale ──────────────────────
       try {
         const data = await getChoirByCode(code);
+
+        // Si aucune chorale trouvée → passer au test code événement
+        if (!data) throw new Error('not a choir');
 
         // Ajouter la chorale dans joined_choirs si pas déjà présente
         const storedChoirs = getStoredChoirs();

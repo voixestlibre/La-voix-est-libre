@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage/authService';
 import { getStoredEvents, getCachedEvent, setStoredEvents } from '../../infrastructure/storage/localStorageService';
-import { getCachedFileUrl, isCacheable, cacheEventFiles, clearEventCache } from '../../infrastructure/storage/cacheService';
+import { getCachedFileUrl, isCacheable } from '../../infrastructure/storage/cacheService';
 import {
   getSong, getSongFiles, fileExists, uploadSongFile, deleteSongFile,
   getSongFileUrl, updateSong, getChoirHashtags, toggleFavoriteSong, toggleCommonSong,

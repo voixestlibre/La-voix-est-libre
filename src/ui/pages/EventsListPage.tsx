@@ -203,7 +203,7 @@
 
     const handleConfirm = async () => {
       if (!confirmBanner) return;
-      const { newEventId, newEventName, newSongIds } = confirmBanner;
+      const { newEventId, newSongIds } = confirmBanner;
       const alreadyCached = getCachedEvent();
       const isDeactivating = alreadyCached && String(alreadyCached.id) === String(newEventId);
 
