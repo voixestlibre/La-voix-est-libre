@@ -681,25 +681,20 @@ export default function SongPage() {
               </>
             )}
           </div>
-          {/* Object PDF — meilleure compatibilité iOS que iframe */}
-          <object
-            data={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-            type="application/pdf"
+          {/* Iframe PDF */}
+          <iframe
+            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
             style={{
               flex: 1,
               border: 'none',
               width: '100%',
               display: 'block',
+              // Correctifs iOS : forcer la largeur à la largeur du viewport
               maxWidth: '100vw',
               minWidth: 0,
             }}
-          >
-            {/* Fallback si object non supporté : lien direct */}
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
-              style={{ color: 'white', padding: '1rem', display: 'block' }}>
-              Ouvrir le PDF
-            </a>
-          </object>
+            title="Partition"
+          />
         </div>
       )}
 
