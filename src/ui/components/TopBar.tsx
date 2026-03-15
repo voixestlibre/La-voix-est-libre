@@ -52,7 +52,7 @@ export default function TopBar({ backUrl }: TopBarProps) {
   };
 
   const menuItems = [
-    { label: 'Home',                  icon: 'fa-house',         path: '/',             always: true  },
+    { label: 'Accueil',               icon: 'fa-house',         path: '/',             always: true  },
     { label: 'Mes chorales',          icon: 'fa-people-group',  path: '/my-choirs',    always: false },
     { label: 'Rejoindre une chorale', icon: 'fa-circle-plus',   path: '/join-choir',   always: true  },
     { label: 'Créer un utilisateur',  icon: 'fa-user-plus',     path: '/create-user',  always: false, adminOnly: true },
