@@ -187,6 +187,14 @@ export default function SongPage() {
 
   // Naviguer vers un autre chant de la liste en conservant le state
   const navigateToSong = (targetId: string) => {
+    // Arrêter et fermer le lecteur audio avant de naviguer
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    setAudioUrl(null);
+    setAudioName('');
+
     navigate(`/song/${targetId}`, {
       state: {
         backUrl: location.state?.backUrl,
@@ -626,7 +634,14 @@ export default function SongPage() {
 
       {/* Overlay PDF plein écran */}
       {pdfUrl && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', backgroundColor: '#0A1F44', zIndex: 1000, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          width: '100%', height: '100%',
+          backgroundColor: '#0A1F44', zIndex: 1000,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+          overflowX: 'hidden', // ← ajouter
+        }}>
           {/* Barre du haut : bouton fermer + lecteur audio si actif ou disponible */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', gap: '0.5rem' }}>
             <button onClick={() => { setPdfUrl(null); setPdfAudioReady(false); setAudioUrl(null); setAudioName(''); }}
@@ -667,7 +682,19 @@ export default function SongPage() {
             )}
           </div>
           {/* Iframe PDF */}
-          <iframe src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`} style={{ flex: 1, border: 'none', width: '100%', display: 'block' }} title="Partition" />
+          <iframe
+            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+            style={{
+              flex: 1,
+              border: 'none',
+              width: '100%',
+              display: 'block',
+              // Correctifs iOS : forcer la largeur à la largeur du viewport
+              maxWidth: '100vw',
+              minWidth: 0,
+            }}
+            title="Partition"
+          />
         </div>
       )}
 
