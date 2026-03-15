@@ -692,9 +692,12 @@ export default function SongPage() {
               display: 'block',
               maxWidth: '100vw',
               minWidth: 0,
+              // Scroll sur l'objet lui-même
+              overflow: 'auto',
+              // Fond blanc
+              backgroundColor: 'white',
             }}
           >
-            {/* Fallback si object non supporté : lien direct */}
             <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
               style={{ color: 'white', padding: '1rem', display: 'block' }}>
               Ouvrir le PDF
