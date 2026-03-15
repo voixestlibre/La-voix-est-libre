@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs, toggleFavoriteSong, toggleCommonSong } from '../../infrastructure/storage/songsService';
-import { getChoirEvents } from '../../infrastructure/storage/eventsService';
+import { getChoirEvents, toggleEventActive } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
@@ -180,6 +180,16 @@ export default function ChoirPage() {
     return groups;
   };
 
+  const handleToggleEventActive = async (evId: string, current: boolean) => {
+    try {
+      await toggleEventActive(evId, !current);
+      // Mettre à jour le state local sans recharger
+      setEvents((prev) =>
+        prev.map((ev) => String(ev.id) === String(evId) ? { ...ev, active: !current } : ev)
+      );
+    } catch {}
+  };
+  
   const handleToggleFavorite = async (songId: string, current: boolean) => {
     try {
       await toggleFavoriteSong(songId, !current);
@@ -251,64 +261,64 @@ export default function ChoirPage() {
                 <ul className="list-music">
                   {events.map((ev) => (
                     <div key={ev.id} className="card-music pink">
-                      <i className="fa fa-calendar-days note"></i>
+                      {/* Icône calendrier : rose si actif, grise si inactif
+                          Cliquable uniquement par le propriétaire ou le délégué créateur */}
+                      <i
+                        className="fa fa-calendar-days note"
+                        onClick={() => {
+                          const canToggle = isOwner || (isDelegate && userParamId !== null && ev.created_by === userParamId);
+                          if (canToggle) handleToggleEventActive(String(ev.id), ev.active ?? true);
+                        }}
+                        style={{
+                          color: (ev.active ?? true) ? '#DA486D' : '#ccc',
+                          cursor: (isOwner || (isDelegate && userParamId !== null && ev.created_by === userParamId)) ? 'pointer' : 'default',
+                        }}
+                      />
                       <div
                         className="text"
                         onClick={() => navigate(`/event/${ev.id}`)}
                         style={{ cursor: 'pointer' }}
                       >
-                        <strong>{ev.name}</strong>
-                        {/* Le code de l'événement est toujours affiché :
-                            l'utilisateur en a besoin pour le partager */}
-                        <span>Code : {formatCode(String(ev.code))}</span>
+                        {/* Griser le contenu si inactif */}
+                        <strong style={{ color: (ev.active ?? true) ? undefined : '#aaa' }}>{ev.name}</strong>
+                        <div style={{ paddingLeft: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', marginTop: '0.2rem' }}>
+                          {ev.event_date && (
+                            <span style={{ fontSize: '0.85rem', color: (ev.active ?? true) ? undefined : '#aaa' }}>
+                              Date : {new Date(ev.event_date).toLocaleDateString('fr-FR')}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.85rem', color: (ev.active ?? true) ? undefined : '#aaa' }}>
+                            Code : {formatCode(String(ev.code))}
+                          </span>
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
                         {/* Icône quitter : uniquement si l'événement a été rejoint directement
-                            (pas via la chorale) — les membres explicites ne peuvent pas quitter
-                            un événement individuellement */}
+                          (pas via la chorale) — les membres explicites ne peuvent pas quitter
+                          un événement individuellement */}
                         {isOwner ? (
-                          <i
-                            className="fa fa-trash trash"
-                            style={{ marginLeft: 0 }}
-                            onClick={() => navigate(`/delete-event/${ev.id}`)}
-                          ></i>
+                          <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${ev.id}`)} />
                         ) : isDelegate && userParamId !== null && ev.created_by === userParamId ? (
                           // Délégué : peut supprimer les événements qu'il a créés
-                          <i
-                            className="fa fa-trash trash"
-                            style={{ marginLeft: 0 }}
-                            onClick={() => navigate(`/delete-event/${ev.id}`)}
-                          ></i>
+                          <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${ev.id}`)} />
                         ) : !isFullMember ? (
                           // Membre fantôme : a rejoint l'événement directement → peut le quitter
-                          <i
-                            className="fa fa-sign-out trash"
-                            style={{ marginLeft: 0 }}
-                            onClick={() => navigate(`/leave-event/${ev.id}`)}
-                          ></i>
+                          <i className="fa fa-sign-out trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/leave-event/${ev.id}`)} />
                         ) : null /* Membre explicite : voit tous les events via la chorale → pas d'icône quitter */}
 
                         {/* Icône offline : bleue si mémorisé, grise sinon → redirige vers my-events */}
                         {(() => {
-                          const isCached = getStoredEvents().find(
-                            (se) => String(se.id) === String(ev.id)
-                          )?.is_cached ?? false;
+                          const isCached = getStoredEvents().find((se) => String(se.id) === String(ev.id))?.is_cached ?? false;
                           return (
                             <i
                               className="fa fa-download"
                               onClick={(e) => { e.stopPropagation(); navigate('/my-events'); }}
-                              style={{
-                                fontSize: '1.1rem',
-                                color: isCached ? '#044C8D' : '#ccc',
-                                cursor: 'pointer',
-                                marginLeft: '0.5rem',
-                              }}
+                              style={{ fontSize: '1.1rem', color: isCached ? '#044C8D' : '#ccc', cursor: 'pointer', marginLeft: '0.5rem' }}
                             />
                           );
                         })()}
                       </div>
-
                     </div>
                   ))}
                 </ul>

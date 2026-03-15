@@ -50,8 +50,9 @@ export default function HomePage() {
         // → uniquement les chants présents dans storedEvents[].songs
         const storedEventsForSearch = getStoredEvents();
         storedEventsForSearch.forEach((e) => {
+          // Ne pas inclure les chants des événements inactifs dans la recherche
+          if (e.active === false) return;
           e.songs?.forEach((s: any) => {
-            // Éviter les doublons
             if (!accessibleSongs.some((a) => a.id === s.id)) {
               accessibleSongs.push({ id: s.id, title: s.title, choir_id: e.choir_id, hashtags: [] });
             }
@@ -67,7 +68,7 @@ export default function HomePage() {
   }, []);
 
   const normalize = (str: string) =>
-  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 
   const handleSearch = (value: string) => {
   setSearchQuery(value);

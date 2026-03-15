@@ -198,6 +198,7 @@ export default function MyChoirsPage() {
             is_cached: existingEvent?.is_cached ?? false,      
             cached_files: existingEvent?.cached_files ?? [],
             event_date: ev.event_date ?? existingEvent?.event_date ?? null,
+            active: ev.active ?? existingEvent?.active ?? true,
           };
         }));
         setStoredEvents(updatedEvents);

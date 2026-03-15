@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
-import { getChoirOwner } from '../../infrastructure/storage/choirsService';
+import { getChoirOwner, getChoir } from '../../infrastructure/storage/choirsService';
 import { getEvent, getEventSongsDetails } from '../../infrastructure/storage/eventsService';
 import { getCachedEvent, getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import { PDFDocument } from 'pdf-lib';
@@ -13,6 +13,7 @@ import TopBar from '../components/TopBar';
 export default function EventPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const [choirName, setChoirName] = useState<string | null>(null);
   const [event, setEvent] = useState<any>(null);
   const [songs, setSongs] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
@@ -146,6 +147,10 @@ export default function EventPage() {
         const eventData = await getEvent(eventId!);
         setEvent(eventData);
 
+        // Récupérer le nom de la chorale pour l'affichage
+        const choirData = await getChoir(String(eventData.choir_id));
+        if (choirData) setChoirName(choirData.name);
+
         // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(String(eventData.choir_id));
         const ownerCheck = currentUser && ownerId === currentUser.id;
@@ -162,6 +167,12 @@ export default function EventPage() {
         // - aucun droit → redirection
         if (!ownerCheck && !hasLocalAccess) {
           navigate('/');
+          return;
+        }
+
+        // Bloquer l'accès si l'événement est inactif pour les non-admins
+        if (eventData.active === false && !ownerCheck && !creatorCheck) {
+          navigate(`/choir/${eventData.choir_id}`, { replace: true });
           return;
         }
 
@@ -188,6 +199,8 @@ export default function EventPage() {
             choir_id: storedEvent.choir_id,
             event_date: storedEvent.event_date ?? null,
           });
+          // Récupérer le nom de la chorale
+          setChoirName(storedEvent?.choir_name ?? null);
           // Chants disponibles offline grâce au cache localStorage
           setSongs(storedEvent.songs ?? []);
         } else { 
@@ -222,11 +235,37 @@ export default function EventPage() {
             {event.name}
           </h2>
 
+          {/* Bandeau événement inactif — visible uniquement pour propriétaire/créateur */}
+          {event.active === false && (isOwner || isCreator) && (
+            <div style={{
+              backgroundColor: '#f5f5f5', border: '1px solid #aaa',
+              borderRadius: '8px', padding: '0.6rem 1rem',
+              marginBottom: '1rem', fontSize: '0.9rem', color: '#888',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+            }}>
+              <i className="fa fa-eye-slash"></i>
+              Cet événement est inactif — invisible pour les autres membres.
+            </div>
+          )}
+
           {/* Code de l'événement : toujours affiché
               (utile pour partager l'événement avec d'autres membres) */}
           <p><strong>Code :</strong> {formatCode(String(event.code))}</p>
 
-          {/* Date : masquée en mode offline car non stockée en localStorage */}
+          {/* Nom de la chorale */}
+          {choirName && (
+            <p>
+              <span
+                onClick={() => navigate(`/choir/${event.choir_id}`)}
+                style={{ color: '#FB8917', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                <i className="fa fa-users" style={{ marginRight: '0.4rem' }}></i>
+                {choirName}
+              </span>
+            </p>
+          )}
+          
+          {/* Date */}
           {formatDate(event.event_date) && (
             <p><strong>Date :</strong> {formatDate(event.event_date)}</p>
           )}

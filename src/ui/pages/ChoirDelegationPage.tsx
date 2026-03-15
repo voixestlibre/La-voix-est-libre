@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCurrentUser, createDelegateAccount, getChoirDelegates } from '../../infrastructure/storage/authService';
+import { getCurrentUser, createDelegateAccount, getChoirDelegates, revokeDelegation } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
@@ -30,6 +30,20 @@ export default function ChoirDelegationPage() {
     };
     init();
   }, [choirId, navigate]);
+
+  const handleRevoke = async (delegateEmail: string) => {
+    if (!window.confirm(`Révoquer la délégation de ${delegateEmail} ?`)) return;
+    setLoading(true);
+    try {
+      await revokeDelegation(delegateEmail, choirId!);
+      // Mettre à jour la liste localement sans recharger
+      setDelegates((prev) => prev.filter((d) => d !== delegateEmail));
+    } catch (err: any) {
+      setMessage(`Erreur : ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -74,9 +88,17 @@ export default function ChoirDelegationPage() {
               </p>
               <ul style={{ listStyle: 'none', padding: 0, marginBottom: '1.5rem' }}>
                 {delegates.map((d) => (
-                  <li key={d} style={{ padding: '0.4rem 0', borderBottom: '1px solid #E6F2FF', color: '#333' }}>
-                    <i className="fa fa-user" style={{ color: '#044C8D', marginRight: '0.5rem' }}></i>
-                    {d}
+                  <li key={d} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid #E6F2FF' }}>
+                    <span style={{ color: '#333' }}>
+                      <i className="fa fa-user" style={{ color: '#044C8D', marginRight: '0.5rem' }}></i>
+                      {d}
+                    </span>
+                    {/* Icône de révocation */}
+                    <i
+                      className="fa fa-trash trash"                    
+                      style={{ color: '#FB8917', marginLeft: '0.5rem' }}
+                      onClick={() => handleRevoke(d)}
+                    />
                   </li>
                 ))}
               </ul>

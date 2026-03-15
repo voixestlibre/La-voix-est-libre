@@ -159,4 +159,31 @@ export async function deleteChoirCascade(choirId: string) {
   // Étape 7 : supprimer la chorale elle-même
   const { error } = await supabase.from('choirs').delete().eq('id', choirId);
   if (error) throw error;
+
+  // Étape 8 : nettoyer choirs_delegations dans users_param
+  // La colonne contient un CSV de choir_ids séparés par ';'
+  // Il faut retirer choirId de la liste pour tous les utilisateurs concernés
+  const { data: delegatedUsers } = await supabase
+    .from('users_param')
+    .select('id, choirs_delegations')
+    .not('choirs_delegations', 'is', null);
+
+  if (delegatedUsers && delegatedUsers.length > 0) {
+    for (const user of delegatedUsers) {
+      const ids = (user.choirs_delegations as string)
+        .split(';')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s !== '' && s !== String(choirId));
+      
+      const newValue = ids.length > 0 ? ids.join(';') : null;
+      
+      // Mettre à jour uniquement si la valeur change
+      if (ids.join(';') !== (user.choirs_delegations as string)) {
+        await supabase
+          .from('users_param')
+          .update({ choirs_delegations: newValue })
+          .eq('id', user.id);
+      }
+    }
+  }  
 }

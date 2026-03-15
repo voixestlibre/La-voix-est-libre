@@ -163,3 +163,71 @@ export async function getChoirDelegates(choirId: string): Promise<string[]> {
     .filter((row) => row.choirs_delegations?.split(';').includes(choirId))
     .map((row) => row.email);
 }
+
+
+// Révoquer la délégation d'un utilisateur pour une chorale
+export async function revokeDelegation(email: string, choirId: string): Promise<void> {
+  // Récupérer les délégations actuelles de l'utilisateur
+  const { data, error } = await supabase
+    .from('users_param')
+    .select('id, choirs_delegations')
+    .eq('email', email.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Utilisateur introuvable');
+
+  // Retirer choirId de la liste CSV
+  const ids = (data.choirs_delegations ?? '')
+    .split(';')
+    .map((s: string) => s.trim())
+    .filter((s: string) => s !== '' && s !== String(choirId));
+
+  const { error: updateError } = await supabase
+    .from('users_param')
+    .update({ choirs_delegations: ids.length > 0 ? ids.join(';') : null })
+    .eq('id', data.id);
+  if (updateError) throw updateError;
+}
+
+
+// Vérifier si l'utilisateur connecté est administrateur
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) return false;
+  const { data } = await supabase
+    .from('users_param')
+    .select('is_admin')
+    .eq('email', user.email.toLowerCase())
+    .maybeSingle();
+  return data?.is_admin === true;
+}
+
+// Créer un nouvel utilisateur standard (depuis un compte admin)
+// Conserve la session de l'admin après la création
+export async function createUserAccount(email: string, password: string): Promise<void> {
+  // Sauvegarder la session admin avant la création
+  const { data: { session: adminSession } } = await supabase.auth.getSession();
+
+  // Créer le compte via signUp — cela connecte automatiquement le nouvel utilisateur
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  if (!data.user) throw new Error('Création du compte échouée');
+
+  // Créer l'entrée dans users_param avec les paramètres par défaut
+  const { error: paramError } = await supabase
+    .from('users_param')
+    .insert([{
+      email: email.toLowerCase(),
+      is_admin: false,
+      choirs_nb: 1,
+    }]);
+  if (paramError) throw paramError;
+
+  // Restaurer la session admin
+  if (adminSession) {
+    await supabase.auth.setSession({
+      access_token: adminSession.access_token,
+      refresh_token: adminSession.refresh_token,
+    });
+  }
+}
