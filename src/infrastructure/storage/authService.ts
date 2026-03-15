@@ -69,7 +69,8 @@ export async function getUserParam(email: string) {
 
 export async function requestPasswordReset(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'https://lavoixestlibre.netlify.app/reset-password',
+    // Utilise l'URL de base de l'environnement courant
+    redirectTo: `${window.location.origin}${import.meta.env.VITE_BASENAME ?? ''}/reset-password`,
   });
   if (error) throw error;
 }

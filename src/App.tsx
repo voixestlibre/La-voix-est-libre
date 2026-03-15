@@ -23,7 +23,7 @@ import UserCreatePage from './ui/pages/UserCreatePage';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.VITE_BASENAME ?? '/'}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/create-choir" element={<ChoirCreationPage />} />  
