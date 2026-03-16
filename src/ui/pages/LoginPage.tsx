@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<{ email: string; isAdmin: boolean } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   // Vérifier si l'utilisateur est déjà connecté au chargement
@@ -79,8 +80,26 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit}>
                 <input type="email" placeholder="Email" value={email}
                   onChange={(e) => setEmail(e.target.value)} required className="page-form-input" />
-                <input type="password" placeholder="Mot de passe" value={password}
-                  onChange={(e) => setPassword(e.target.value)} required className="page-form-input" />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mot de passe"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="page-form-input"
+                    style={{ paddingRight: '2.5rem' }}
+                  />
+                  <i
+                    className={`fa ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute', right: '0.8rem', top: '50%',
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer', color: '#044C8D', fontSize: '1rem',
+                    }}
+                  />
+                </div>
                 <button type="submit" className="page-button">
                   Se connecter
                 </button>
