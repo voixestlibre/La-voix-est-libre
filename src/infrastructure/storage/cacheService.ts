@@ -20,19 +20,27 @@ export async function cacheEventFiles(
   eventId: string,
   files: { name: string; url: string }[],
   onProgress?: (downloaded: number, total: number) => void
-): Promise<void> {
+): Promise<{ url: string; ok: boolean }[]> {
   const toCache = files.filter((f) => isCacheable(f.name));
-  if (toCache.length === 0) return;
+  if (toCache.length === 0) return [];
 
   const cache = await caches.open(cacheName(eventId));
   let downloaded = 0;
+  const results: { url: string; ok: boolean }[] = [];
 
   for (const file of toCache) {
-    const response = await fetch(file.url);
-    await cache.put(file.url, response);
+    let ok = false;
+    try {
+      const response = await fetch(file.url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await cache.put(file.url, response);
+      ok = true;
+    } catch {}
+    results.push({ url: file.url, ok });
     downloaded++;
     onProgress?.(downloaded, toCache.length);
   }
+  return results;
 }
 
 // Supprimer tout le cache d'un événement

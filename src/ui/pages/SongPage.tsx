@@ -49,6 +49,8 @@ export default function SongPage() {
   // PDF plein écran
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfIsIOS, setPdfIsIOS] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfGenerateError, setPdfGenerateError] = useState<string | null>(null);
 
   // Lecteur audio
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -142,7 +144,8 @@ export default function SongPage() {
 
         // Fallback offline : chercher les fichiers dans le cache
         const cachedEvent = getCachedEvent();
-        if (cachedEvent && String(cachedEvent.id) === String(matchingEvent.id) && cachedEvent.cached_files) {
+        if (cachedEvent?.cached_files) {
+        // if (cachedEvent && String(cachedEvent.id) === String(matchingEvent.id) && cachedEvent.cached_files) {
           const offlineFiles: { name: string }[] = [];
           for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
             const publicUrl = getSongFileUrl(String(songId), f.fileName);
@@ -203,6 +206,33 @@ export default function SongPage() {
       },
       replace: true, // ne pas empiler dans l'historique
     });
+  };
+
+  const handleGenerateLivret = async (fileName: string) => {
+    setIsGeneratingPdf(true);
+    setPdfGenerateError(null);
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      const url = getPublicUrl(fileName);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Erreur téléchargement : ${response.status}`);
+      const bytes = await response.arrayBuffer();
+      const srcDoc = await PDFDocument.load(bytes);
+      const outDoc = await PDFDocument.create();
+      const pages = await outDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+      pages.forEach((p) => outDoc.addPage(p));
+      const pdfBytes = await outDoc.save();
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${song.title}.pdf`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err: any) {
+      setPdfGenerateError(`Erreur : ${err.message}`);
+    }
+    setIsGeneratingPdf(false);
   };
 
   // Pointer Events pour le swipe (fonctionne aussi en mode mobile DevTools)
@@ -649,7 +679,7 @@ export default function SongPage() {
           {/* Barre du haut : bouton fermer + lecteur audio si actif ou disponible */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', gap: '0.5rem' }}>
             <button onClick={() => { setPdfUrl(null); setPdfAudioReady(false); setAudioUrl(null); setAudioName(''); }}
-              style={{ padding: '0.4rem 0.8rem', fontSize: '1rem', background: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              style={{ color: '#044C8D', padding: '0.4rem 0.8rem', fontSize: '1rem', background: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               ✕ Fermer
             </button>
             {/* Lecteur audio : affiché si un audio est en cours OU si des audios sont disponibles */}
@@ -687,22 +717,27 @@ export default function SongPage() {
           </div>
 
           {/* Deuxième ligne iOS : ouvrir dans un autre onglet */}
-          {pdfIsIOS && (
-            <div style={{ display: 'flex', padding: '0 0.5rem 0.5rem 0.5rem' }}>
-              <a 
-                href={pdfUrl!}
-                target="_blank"
-                rel="noopener noreferrer"
+          {pdfIsIOS && pdfUrl && (
+            <div style={{ display: 'flex', padding: '0 0.5rem 0.5rem 0.5rem', flexDirection: 'column', gap: '0.4rem' }}>
+              <button
+                onClick={() => {
+                  // Retrouver le fileName depuis pdfUrl
+                  const fileName = files.find(f => getPublicUrl(f.name) === pdfUrl)?.name;
+                  if (fileName) handleGenerateLivret(fileName);
+                }}
+                disabled={isGeneratingPdf}
                 style={{
-                  flex: 1, textAlign: 'center',
                   padding: '0.4rem 0.8rem', fontSize: '0.9rem',
                   background: 'white', border: 'none', borderRadius: '8px',
-                  cursor: 'pointer', color: '#044C8D', textDecoration: 'none',
+                  cursor: 'pointer', color: '#044C8D',
                 }}
               >
-                <i className="fa fa-arrow-up-right-from-square" style={{ marginRight: '0.4rem' }}></i>
-                Ouvrir dans un nouvel onglet
-              </a>
+                <i className="fa fa-file-pdf" style={{ marginRight: '0.4rem' }}></i>
+                {isGeneratingPdf ? 'Génération...' : 'Télécharger le PDF (si pb sous iOS)'}
+              </button>
+              {pdfGenerateError && (
+                <p style={{ color: '#DA486D', fontSize: '0.8rem', margin: 0 }}>{pdfGenerateError}</p>
+              )}
             </div>
           )}
 
