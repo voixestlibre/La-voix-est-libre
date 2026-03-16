@@ -26,6 +26,7 @@
     const [collecting, setCollecting] = useState(false);
     const [confirmBanner, setConfirmBanner] = useState<ConfirmBanner | null>(null);
     const [downloading, setDownloading] = useState(false);
+    const [downloadReport, setDownloadReport] = useState<{ name: string; songTitle: string; ok: boolean }[] | null>(null);
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
     const navigate = useNavigate();
 
@@ -232,12 +233,15 @@
 
       try {
         // Collecter tous les fichiers PDF de tous les chants de l'événement
-        const allFiles: { name: string; url: string; songId: string }[] = [];
+        const allFiles: { name: string; url: string; songId: string; songTitle: string }[] = [];
         for (const songId of newSongIds) {
           const files = await getSongFiles(songId);
+          // Récupérer le titre du chant depuis le localStorage
+          const storedEvent = getStoredEvents().find((e) => String(e.id) === String(newEventId));
+          const songTitle = storedEvent?.songs.find((s) => String(s.id) === String(songId))?.title ?? songId;
           for (const f of files) {
             if (isCacheable(f.name)) {
-              allFiles.push({ name: f.name, url: getSongFileUrl(songId, f.name), songId });
+              allFiles.push({ name: f.name, url: getSongFileUrl(songId, f.name), songId, songTitle });
             }
           }
         }
@@ -245,9 +249,16 @@
         setProgress({ done: 0, total: allFiles.length });
 
         // Télécharger et mettre en cache tous les fichiers
-        await cacheEventFiles(newEventId, allFiles, (done, total) => {
+        const results = await cacheEventFiles(newEventId, allFiles, (done, total) => {
           setProgress({ done, total });
         });
+
+        // Construire le rapport
+        setDownloadReport(allFiles.map((f, i) => ({
+          name: f.name,
+          songTitle: f.songTitle,
+          ok: results[i]?.ok ?? false,
+        })));
 
         // Marquer l'événement comme mémorisé dans le localStorage
         setCachedEventId(newEventId);
@@ -261,10 +272,11 @@
         ));        
       } catch {
         // Échec silencieux — l'icône restera grise
+      } finally {
+        setDownloading(false);  // ← toujours exécuté
+        setProgress(null);
       }
 
-      setDownloading(false);
-      setProgress(null);
       // Rafraîchir l'affichage pour mettre à jour les icônes
       setEvents((prev) => [...prev]);
     };
@@ -354,6 +366,28 @@
                 transition: 'width 0.2s',
               }} />
             </div>
+          </div>
+        )}
+
+        {/* Rapport de téléchargement */}
+        {downloadReport && (
+          <div style={{ marginBottom: '1rem', backgroundColor: '#F9F9F9', borderRadius: '8px', padding: '0rem 1rem', border: '1px solid #ddd' }}>
+            <p style={{ fontWeight: 'bold', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+              Résultat du téléchargement :
+            </p>
+            {downloadReport.map((r, i) => (
+              <div key={i} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                <i className={`fa ${r.ok ? 'fa-check' : 'fa-xmark'}`} style={{ color: r.ok ? 'green' : 'red', width: '1rem' }} />
+                <span style={{ color: r.ok ? '#333' : 'red' }}>
+                  <span style={{ color: '#888', marginRight: '0.3rem' }}>{r.songTitle} —</span>
+                  {r.name}
+                </span>
+              </div>
+            ))}
+            <button className="page-button2 pink" style={{ marginBottom: '0.8rem', marginTop: '0.6rem', padding: '0.3rem 0.8rem', fontSize: '0.85rem' }}
+              onClick={() => setDownloadReport(null)}>
+              Fermer
+            </button>
           </div>
         )}
 
