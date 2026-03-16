@@ -48,6 +48,7 @@ export default function SongPage() {
 
   // PDF plein écran
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfIsIOS, setPdfIsIOS] = useState(false);
 
   // Lecteur audio
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -401,6 +402,9 @@ export default function SongPage() {
       url = getPublicUrl(fileName);
     }
     if (isPdf(fileName)) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      setPdfIsIOS(isIOS);      
       setPdfUrl(url);
       // Si pas d'audio en cours mais qu'il y en a de disponibles, préparer le bouton note
       if (!audioUrl && files.some((f) => isAudio(f.name))) setPdfAudioReady(true);
@@ -681,6 +685,27 @@ export default function SongPage() {
               </>
             )}
           </div>
+
+          {/* Deuxième ligne iOS : ouvrir dans un autre onglet */}
+          {pdfIsIOS && (
+            <div style={{ display: 'flex', padding: '0 0.5rem 0.5rem 0.5rem' }}>
+              <a 
+                href={pdfUrl!}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  flex: 1, textAlign: 'center',
+                  padding: '0.4rem 0.8rem', fontSize: '0.9rem',
+                  background: 'white', border: 'none', borderRadius: '8px',
+                  cursor: 'pointer', color: '#044C8D', textDecoration: 'none',
+                }}
+              >
+                <i className="fa fa-arrow-up-right-from-square" style={{ marginRight: '0.4rem' }}></i>
+                Ouvrir dans un nouvel onglet
+              </a>
+            </div>
+          )}
+
           {/* Iframe PDF */}
           <iframe
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
