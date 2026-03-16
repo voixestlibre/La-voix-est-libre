@@ -145,7 +145,6 @@ export default function SongPage() {
         // Fallback offline : chercher les fichiers dans le cache
         const cachedEvent = getCachedEvent();
         if (cachedEvent?.cached_files) {
-        // if (cachedEvent && String(cachedEvent.id) === String(matchingEvent.id) && cachedEvent.cached_files) {
           const offlineFiles: { name: string }[] = [];
           for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
             const publicUrl = getSongFileUrl(String(songId), f.fileName);
