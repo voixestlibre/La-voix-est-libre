@@ -21,6 +21,13 @@ import ResetRequestPage from './ui/pages/ResetRequestPage';
 import ResetPasswordPage from './ui/pages/ResetPasswordPage';
 import UserCreatePage from './ui/pages/UserCreatePage';
 
+// Forcer la mise à jour du Service Worker si une nouvelle version est disponible
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((reg) => reg.update());
+  });
+}
+
 export default function App() {
   return (
     <BrowserRouter basename={import.meta.env.VITE_BASENAME ?? '/'}>
