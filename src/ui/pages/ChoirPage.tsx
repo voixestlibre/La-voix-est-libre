@@ -131,7 +131,17 @@ export default function ChoirPage() {
         // On affiche uniquement les événements auxquels l'utilisateur a accès
         const offlineEvents = joinedEvents
           .filter((e: any) => String(e.choir_id) === String(id))
-          .map((e: any) => ({ id: e.id, name: e.name, code: e.code }));
+          .map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            code: e.code,
+            event_date: e.event_date
+          }))
+          .sort(
+            (a, b) =>
+              new Date(b.event_date).getTime() -
+              new Date(a.event_date).getTime()
+          );
         setEvents(offlineEvents);
 
         // Pas de chants accessibles offline (les fichiers ne sont pas en cache)
