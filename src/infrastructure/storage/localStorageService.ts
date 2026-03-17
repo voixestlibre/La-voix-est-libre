@@ -73,6 +73,7 @@ export function setCachedEventId(eventId: string): void {
     getStoredEvents().map((e) => ({
       ...e,
       is_cached: String(e.id) === String(eventId),
+      cached_files: String(e.id) === String(eventId) ? (e.cached_files ?? []) : [],
     }))
   );
 }
@@ -80,6 +81,10 @@ export function setCachedEventId(eventId: string): void {
 // Démarquer l'événement mémorisé (sans supprimer le cache API — à faire séparément)
 export function clearCachedEventId(): void {
   setStoredEvents(
-    getStoredEvents().map((e) => ({ ...e, is_cached: false }))
+    getStoredEvents().map((e) => ({ 
+      ...e, 
+      is_cached: false,
+      cached_files: [],
+    }))
   );
 }

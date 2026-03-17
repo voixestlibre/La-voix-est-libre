@@ -116,7 +116,12 @@
 
           setEvents(allValidEvents);
         } catch {
-          setEvents(storedEvents);
+          const sortedStoredEvents = [...storedEvents].sort(
+            (a, b) =>
+              new Date(b.event_date ?? 0).getTime() -
+              new Date(a.event_date ?? 0).getTime()
+          );
+          setEvents(sortedStoredEvents);
         }
 
         setLoading(false);
