@@ -19,6 +19,7 @@ export default function SongEditPage() {
   const [pageLoading, setPageLoading] = useState(true);
 
   const [title, setTitle] = useState('');
+  const [code, setCode] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [hashtagInput, setHashtagInput] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -41,6 +42,7 @@ export default function SongEditPage() {
         try {
           const data = await getSong(songId!);
           setTitle(data.title);
+          setCode(data.code ?? '');
           setHashtags(data.hashtags);
           setResolvedChoirId(data.choir_id);
 
@@ -131,11 +133,11 @@ export default function SongEditPage() {
     try {
       if (isEditing) {
         // Mettre à jour le chant existant
-        await updateSong(songId!, title, hashtags);
+        await updateSong(songId!, title, hashtags, code || null);
         navigate(`/song/${songId}`);
       } else {
         // Créer le chant et rediriger vers sa page
-        const data = await createSong(resolvedChoirId, title, hashtags);
+        const data = await createSong(resolvedChoirId, title, hashtags, code || null);
         navigate(`/song/${data.id}`);
       }
     } catch (err: any) {
@@ -158,6 +160,15 @@ export default function SongEditPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
+            className="page-form-input"
+          />
+
+          {/* Code du chant (facultatif) */}
+          <input
+            type="text"
+            placeholder="Code (facultatif)"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
             className="page-form-input"
           />
 
