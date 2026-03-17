@@ -9,10 +9,11 @@ const stringToHashtags = (str: string | null) =>
   str ? str.split(',').filter((h) => h.trim().length > 0) : [];
 
 // Créer un chant
-export async function createSong(choirId: string, title: string, hashtags: string[]) {
+export async function createSong(choirId: string, title: string, hashtags: string[], code: string | null) {
+  const normalizedCode = code ? code.trim().toUpperCase() : null;
   const { data, error } = await supabase
     .from('songs')
-    .insert([{ choir_id: choirId, title, hashtags: hashtagsToString(hashtags) }])
+    .insert([{ choir_id: choirId, title, hashtags: hashtagsToString(hashtags), normalizedCode }])
     .select()
     .single();
   if (error) throw error;
@@ -109,10 +110,11 @@ export async function getChoirHashtags(choirId: string): Promise<string[]> {
 }
 
 // Mettre à jour un chant
-export async function updateSong(songId: string, title: string, hashtags: string[]) {
+export async function updateSong(songId: string, title: string, hashtags: string[], code: string | null) {
+  const normalizedCode = code ? code.trim().toUpperCase() : null;
   const { error } = await supabase
     .from('songs')
-    .update({ title, hashtags: hashtagsToString(hashtags) })
+    .update({ title, hashtags: hashtagsToString(hashtags), normalizedCode })
     .eq('id', songId);
   if (error) throw error;
 }
@@ -178,7 +180,7 @@ export async function getSongsByChoirIds(choirIds: string[]) {
   if (choirIds.length === 0) return [];
   const { data, error } = await supabase
     .from('songs')
-    .select('id, title, hashtags, choir_id')
+    .select('id, title, hashtags, choir_id, code')
     .in('choir_id', choirIds)
     .order('title');
   if (error) throw error;

@@ -462,6 +462,20 @@ export default function SongPage() {
           <h2>
             <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
             {song.title}
+
+            {/* Code visible uniquement pour le propriétaire */}
+            {isOwner && song.code && (
+              <span style={{
+                marginLeft: '0.6rem',
+                fontSize: '0.75rem',
+                backgroundColor: '#eee',
+                padding: '0.2rem 0.5rem',
+                borderRadius: '6px',
+                color: '#555'
+              }}>
+                {song.code}
+              </span>
+            )}
           </h2>
 
           {/* Navigation swipe : flèches + position X/N */}
