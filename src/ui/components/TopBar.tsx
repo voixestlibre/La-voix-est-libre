@@ -63,7 +63,7 @@ export default function TopBar({ backUrl }: TopBarProps) {
     <div className="top-bar">
       {/* Gauche : Maison (menu déroulant) puis < */}
       <div style={{ display: 'flex', gap: '0.2rem', position: 'relative' }} ref={menuRef}>
-        <span className="navigation" style={{ fontSize: '1.4rem' }} onClick={() => setMenuOpen(!menuOpen)}>
+        <span className="navigation" style={{ fontSize: '1.4rem' }} onClick={() => menuOpen ? navigate('/') : setMenuOpen(true)}>
           <i className="fa fa-house"></i>
         </span>
         <span className="navigation" style={{ fontSize: '1.4rem' }} onClick={() => effectiveBackUrl ? navigate(effectiveBackUrl, { state: {} }) : navigate(-1)}>
