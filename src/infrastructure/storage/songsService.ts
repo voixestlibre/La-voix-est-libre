@@ -140,8 +140,11 @@ export function getSongFileUrl(songId: string, fileName: string, code?: string) 
       if (suffix) {
         realName = `${code}-${suffix}.mp3`;
       }
+    } else {
+      // MP3 complet sans suffixe de voix : "Mon chant.mp3" → "yyyyyy.mp3"
+      realName = `${code}.mp3`;
     }
-  }
+  }  
 
   if (!realName) {
     // fallback pour sécurité
@@ -289,7 +292,10 @@ function generateExternalFiles(songTitle: string, code: string) {
     //files.push({ name: `${code}-${i}.pdf`, urlSuffix: `${songTitle} - Page ${i}.pdf` });
   //}
 
-  // MP3s
+  // MP3 complet (sans suffixe de voix)
+  files.push({ name: `${code}.mp3`, urlSuffix: `${songTitle}.mp3` });
+  
+  // Autres MP3s
   const audioMap: Record<string, string> = {
     'A': 'Alto',
     'A2': 'Alto 2',
@@ -314,4 +320,16 @@ async function urlExists(url: string) {
   } catch {
     return false;
   }
+}
+
+
+export async function getSongByTitle(choirId: string, title: string) {
+  const { data, error } = await supabase
+    .from('songs')
+    .select('id, title, code, hashtags')
+    .eq('choir_id', choirId)
+    .eq('title', title)
+    .maybeSingle();
+  if (error) throw error;
+  return data; // null si pas trouvé
 }
