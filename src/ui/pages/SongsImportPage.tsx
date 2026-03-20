@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
-import { createSong, uploadSongFile, fileExists, songTitleExists } from '../../infrastructure/storage/songsService';
+import { createSong, uploadSongFile, fileExists, songTitleExists, updateSong, getSong, getSongByTitle } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 
@@ -40,66 +40,80 @@ export default function ImportSongPage() {
 
   // Importer un seul répertoire et retourner le rapport
   const importDirectory = async (dirEntry: FileSystemDirectoryEntry): Promise<ImportReport> => {
-    const songTitle = dirEntry.name;
+    const rawName = dirEntry.name;
     const report: ImportReport = {
-      songTitle,
+      songTitle: rawName,
       success: false,
       attachedFiles: [],
       skippedFiles: [],
       errors: [],
     };
-
+  
+    // Extraire le nom et le code depuis le nom du répertoire
+    const codeMatch = rawName.match(/^(.+?)\s*-\s*Code-(.+)$/);
+    const songTitle = codeMatch ? codeMatch[1].trim() : rawName;
+    const songCode = codeMatch ? codeMatch[2].trim().toUpperCase() : null;
+    report.songTitle = songTitle;
+  
     // Vérifier si un chant avec ce nom existe déjà
-    const exists = await songTitleExists(choirId!, songTitle);
-    if (exists) {
-      report.errors.push(`Un chant nommé "${songTitle}" existe déjà.`);
+    const existingSong = await getSongByTitle(choirId!, songTitle);
+  
+    if (existingSong) {
+      if (!existingSong.code && songCode) {
+        // Mettre à jour le code
+        const hashtags = existingSong.hashtags
+          ? existingSong.hashtags.split(',').filter(Boolean)
+          : [];
+        await updateSong(existingSong.id, existingSong.title, hashtags, songCode);
+        report.errors.push(`Chant existant — Code "${songCode}" associé.`);
+      } else if (existingSong.code && existingSong.code !== songCode) {
+        report.errors.push(`Chant existant avec un code différent (${existingSong.code}) — Import ignoré.`);
+      } else {
+        report.errors.push(`Chant existant — Import ignoré.`);
+      }
       return report;
     }
-
-    // Créer le chant avec le nom du répertoire
-    const song = await createSong(choirId!, songTitle, [], null);
+  
+    // Créer le chant
+    const song = await createSong(choirId!, songTitle, [], songCode);
     report.success = true;
-
-    // Lire les fichiers du répertoire
+  
+    // Lire et uploader les fichiers
     const reader = dirEntry.createReader();
     const entries = await readEntries(reader);
-
-    // Traiter chaque fichier
+  
     for (const fileEntry of entries) {
       if (!fileEntry.isFile) continue;
       const file = await readFile(fileEntry as FileSystemFileEntry);
-
-      // Ignorer les fichiers non audio/pdf
+  
       if (!isValidFile(file.name)) {
         report.skippedFiles.push(file.name);
         continue;
       }
-
+  
       try {
-        // Nettoyer les accents du nom
         const ext = file.name.split('.').pop()!;
         const baseName = file.name.slice(0, -(ext.length + 1));
         const cleanName = baseName
           .replace(/œ/g, 'oe').replace(/Œ/g, 'Oe')
           .replace(/æ/g, 'ae').replace(/Æ/g, 'Ae')
           .replace(/[,;]/g, '')
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');        
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const finalName = `${cleanName}.${ext}`;
-
-        // Vérifier si le fichier existe déjà
+  
         const alreadyExists = await fileExists(song.id, finalName);
         if (alreadyExists) {
           report.skippedFiles.push(`${finalName} (déjà existant)`);
           continue;
         }
-
+  
         await uploadSongFile(song.id, finalName, file);
         report.attachedFiles.push(finalName);
       } catch (err: any) {
         report.errors.push(`${file.name} : ${err.message}`);
       }
     }
-
+  
     return report;
   };
 
