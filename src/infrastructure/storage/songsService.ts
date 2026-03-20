@@ -333,3 +333,18 @@ export async function getSongByTitle(choirId: string, title: string) {
   if (error) throw error;
   return data; // null si pas trouvé
 }
+
+
+export async function incrementSongViews(songId: string) {
+  try {
+    const { data } = await supabase
+      .from('songs')
+      .select('views')
+      .eq('id', songId)
+      .single();
+    await supabase
+      .from('songs')
+      .update({ views: (data?.views ?? 0) + 1 })
+      .eq('id', songId);
+  } catch {}
+}

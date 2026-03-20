@@ -4,7 +4,7 @@ import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage
 import { getStoredEvents, getCachedEvent, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import { getCachedFileUrl, isCacheable } from '../../infrastructure/storage/cacheService';
 import {
-  getSong, getSongFiles, fileExists, uploadSongFile, deleteSongFile,
+  getSong, getSongFiles, fileExists, uploadSongFile, deleteSongFile, incrementSongViews,
   getSongFileUrl, updateSong, getChoirHashtags, toggleFavoriteSong, toggleCommonSong,
 } from '../../infrastructure/storage/songsService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
@@ -110,6 +110,9 @@ export default function SongPage() {
         }
 
         await fetchFiles(songData.title, songData.code ?? undefined);
+        
+        // Incrémenter le compteur de vues
+        incrementSongViews(String(songId)).catch(() => {});
 
         // Vérifier si ce chant appartient à l'événement mémorisé
         const cachedEvent = getCachedEvent();

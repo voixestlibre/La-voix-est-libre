@@ -289,8 +289,23 @@ export default function ChoirPage() {
                         onClick={() => navigate(`/event/${ev.id}`)}
                         style={{ cursor: 'pointer' }}
                       >
-                        {/* Griser le contenu si inactif */}
-                        <strong style={{ color: (ev.active ?? true) ? undefined : '#aaa' }}>{ev.name}</strong>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {/* Griser le contenu si inactif */}
+                          <strong style={{ color: (ev.active ?? true) ? undefined : '#aaa' }}>{ev.name}</strong>
+
+                          {isOwner && ev.views > 0 && (
+                            <span style={{
+                              fontSize: '0.75rem', color: '#888',
+                              backgroundColor: '#f0f0f0',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '6px',
+                            }}>
+                              {ev.views} vue{ev.views > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+
                         <div style={{ paddingLeft: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', marginTop: '0.2rem' }}>
                           {ev.event_date && (
                             <span style={{ fontSize: '0.85rem', color: (ev.active ?? true) ? undefined : '#aaa' }}>
@@ -492,7 +507,8 @@ export default function ChoirPage() {
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <strong>{s.title}</strong>
-                          {s.code && (
+
+                          {isOwner && s.code && (
                             <span style={{
                               fontSize: '0.7rem',
                               backgroundColor: '#eee',
@@ -503,6 +519,19 @@ export default function ChoirPage() {
                               {s.code}
                             </span>
                           )}
+
+                          {isOwner && s.views > 0 && (
+                            <span style={{
+                              fontSize: '0.7rem', color: '#888',
+                              backgroundColor: '#f0f0f0',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '6px',
+                              marginLeft: '0.3rem',
+                            }}>
+                              {s.views} vue{s.views > 1 ? 's' : ''}
+                            </span>
+                          )}
+
                         </div>
 
                         {s.hashtags?.length > 0 && (
@@ -563,7 +592,8 @@ export default function ChoirPage() {
                               >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <strong>{s.title}</strong>
-                                {s.code && (
+
+                                {isOwner && s.code && (
                                   <span style={{
                                     fontSize: '0.7rem',
                                     backgroundColor: '#eee',
@@ -574,6 +604,19 @@ export default function ChoirPage() {
                                     {s.code}
                                   </span>
                                 )}
+
+                                {isOwner && s.views > 0 && (
+                                  <span style={{
+                                    fontSize: '0.7rem', color: '#888',
+                                    backgroundColor: '#f0f0f0',
+                                    padding: '0.15rem 0.4rem',
+                                    borderRadius: '6px',
+                                    marginLeft: '0.3rem',
+                                  }}>
+                                    {s.views} vue{s.views > 1 ? 's' : ''}
+                                  </span>
+                                )}
+
                               </div>
                             </div>
                             {/* Icône delete — propriétaire uniquement */}

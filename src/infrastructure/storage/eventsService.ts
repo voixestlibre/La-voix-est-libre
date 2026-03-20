@@ -207,3 +207,18 @@ export async function toggleEventActive(eventId: string, active: boolean) {
     .eq('id', parseInt(eventId, 10));
   if (error) throw error;
 }
+
+
+export async function incrementEventViews(eventId: string) {
+  try {
+    const { data } = await supabase
+      .from('events')
+      .select('views')
+      .eq('id', parseInt(eventId, 10))
+      .single();
+    await supabase
+      .from('events')
+      .update({ views: (data?.views ?? 0) + 1 })
+      .eq('id', parseInt(eventId, 10));
+  } catch {}
+}
