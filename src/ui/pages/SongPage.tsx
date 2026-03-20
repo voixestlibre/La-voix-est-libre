@@ -65,6 +65,15 @@ export default function SongPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      setFiles([]);
+      setIsOffline(false);
+      setSong(null);
+      setIsOwner(false);
+      setIsDelegate(false);
+      setCachedEventIdState(null);
+      setDownloadedFiles(new Set());
+      setLoading(true);
+
       // Récupérer l'utilisateur connecté
       const currentUser = await getCurrentUser();
       const storedEvents = getStoredEvents();
