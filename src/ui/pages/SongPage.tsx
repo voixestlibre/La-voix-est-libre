@@ -47,10 +47,9 @@ export default function SongPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // PDF plein écran
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfIsIOS, setPdfIsIOS] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [pdfGenerateError, setPdfGenerateError] = useState<string | null>(null);
+  const [pdfPages, setPdfPages] = useState<string[]>([]); // URLs des images de chaque page
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Lecteur audio
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -101,7 +100,7 @@ export default function SongPage() {
           return;
         }
 
-        await fetchFiles();
+        await fetchFiles(songData.title, songData.code ?? undefined);
 
         // Vérifier si ce chant appartient à l'événement mémorisé
         const cachedEvent = getCachedEvent();
@@ -114,7 +113,7 @@ export default function SongPage() {
             // Construire la liste des fichiers déjà téléchargés
             const downloaded = new Set<string>();
             for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
-              const publicUrl = getSongFileUrl(String(songId), f.fileName);
+              const publicUrl = f.url ?? getSongFileUrl(String(songId), f.fileName);
               const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
               if (cachedUrl) downloaded.add(f.fileName);
             }
@@ -147,7 +146,7 @@ export default function SongPage() {
         if (cachedEvent?.cached_files) {
           const offlineFiles: { name: string }[] = [];
           for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
-            const publicUrl = getSongFileUrl(String(songId), f.fileName);
+            const publicUrl = f.url ?? getSongFileUrl(String(songId), f.fileName);
             const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
             if (cachedUrl) offlineFiles.push({ name: f.fileName });
           }
@@ -207,37 +206,40 @@ export default function SongPage() {
     });
   };
 
-  const handleGenerateLivret = async (fileName: string) => {
-    setIsGeneratingPdf(true);
-    setPdfGenerateError(null);
+  const handleOpenPdf = async (url: string) => {
+    setPdfLoading(true);
+    setPdfError(null);
+    setPdfPages([]);
     try {
-      const { PDFDocument } = await import('pdf-lib');
-      const url = getPublicUrl(fileName);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Erreur téléchargement : ${response.status}`);
-      const bytes = await response.arrayBuffer();
-      const srcDoc = await PDFDocument.load(bytes);
-      const outDoc = await PDFDocument.create();
-      const pages = await outDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-      pages.forEach((p) => outDoc.addPage(p));
-      const pdfBytes = await outDoc.save();
-      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `${song.title}.pdf`;
-      a.click();
-      URL.revokeObjectURL(blobUrl);
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      const pages: string[] = [];
+  
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2 }); // scale 2 pour bonne résolution
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d')!;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        pages.push(canvas.toDataURL('image/jpeg', 0.85));
+      }
+      setPdfPages(pages);
+      if (!audioUrl && files.some((f) => isAudio(f.name))) setPdfAudioReady(true);
     } catch (err: any) {
-      setPdfGenerateError(`Erreur : ${err.message}`);
+      setPdfError(`Erreur : ${err.message}`);
     }
-    setIsGeneratingPdf(false);
+    setPdfLoading(false);
   };
 
   // Pointer Events pour le swipe (fonctionne aussi en mode mobile DevTools)
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Ignorer si PDF ouvert ou pas de liste de navigation
-    if (pdfUrl || !songList) return;
+    if ((pdfPages.length > 0 || pdfLoading) || !songList) return;
     pointerStartX.current = e.clientX;
   };
 
@@ -272,8 +274,8 @@ export default function SongPage() {
   };
   
   // Lister les fichiers triés : PDF en premier, puis audio, ordre alphabétique dans chaque groupe
-  const fetchFiles = async () => {
-    const data = await getSongFiles(songId!);
+  const fetchFiles = async (songTitle?: string, songCode?: string) => {
+    const data = await getSongFiles(songId!, songTitle, songCode);
     const sorted = [...data].sort((a, b) => {
       const extA = a.name.split('.').pop()?.toLowerCase() || '';
       const extB = b.name.split('.').pop()?.toLowerCase() || '';
@@ -298,7 +300,7 @@ export default function SongPage() {
       ? song.hashtags
       : [...(song.hashtags || []), tag];
     try {
-      await updateSong(song.id, song.title, updatedHashtags);
+      await updateSong(song.id, song.title, updatedHashtags, song.code ?? null);
       setSong({ ...song, hashtags: updatedHashtags });
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
@@ -341,7 +343,7 @@ export default function SongPage() {
       setLabel('');
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      await fetchFiles();
+      await fetchFiles(song?.title, song?.code ?? undefined);
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
     }
@@ -353,7 +355,7 @@ export default function SongPage() {
     if (!window.confirm(`Êtes-vous sûr de vouloir supprimer "${fileName}" ?`)) return;
     try {
       await deleteSongFile(songId!, fileName);
-      await fetchFiles();
+      await fetchFiles(song?.title, song?.code ?? undefined);
     } catch (err: any) {
       setMessage(`Erreur lors de la suppression : ${err.message}`);
     }
@@ -362,7 +364,11 @@ export default function SongPage() {
   // Ajouter ou supprimer un fichier du cache de l'événement mémorisé
   const handleCacheToggle = async (fileName: string) => {
     if (!cachedEventId || fileProgress) return;
-    const publicUrl = getSongFileUrl(songId!, fileName);
+    const cachedEvent = getCachedEvent();
+    const cachedFile = cachedEvent?.cached_files?.find(
+      (f) => String(f.songId) === String(songId) && f.fileName === fileName
+    );
+    const publicUrl = cachedFile?.url ?? getPublicUrl(fileName);
     if (downloadedFiles.has(fileName)) {
       // Supprimer le fichier du cache Cache API
       setFileProgress({ done: 0, total: 1 });
@@ -391,7 +397,7 @@ export default function SongPage() {
       const stored = getStoredEvents();
       setStoredEvents(stored.map((e) =>
         String(e.id) === String(cachedEventId)
-          ? { ...e, cached_files: [...(e.cached_files ?? []), { songId: String(songId), fileName }]}
+          ? { ...e, cached_files: [...(e.cached_files ?? []), { songId: String(songId), fileName, url: publicUrl }]}
           : e
       ));
       // Mettre à jour l'état local
@@ -410,7 +416,10 @@ export default function SongPage() {
   };
 
   // Obtenir l'URL publique d'un fichier dans le bucket
-  const getPublicUrl = (fileName: string) => getSongFileUrl(songId!, fileName);
+  const getPublicUrl = (fileName: string) => {
+    const found = files.find(f => f.name === fileName);
+    return found?.url ?? getSongFileUrl(songId!, fileName);
+  };
 
   // Déterminer si fichier audio
   const isAudio = (fileName: string) =>
@@ -425,18 +434,16 @@ export default function SongPage() {
     let url: string;
     if (isOffline) {
       const cachedEvent = getCachedEvent();
-      const publicUrl = getSongFileUrl(songId!, fileName);
+      const cachedFile = cachedEvent?.cached_files?.find(
+        (f) => String(f.songId) === String(songId) && f.fileName === fileName
+      );
+      const publicUrl = cachedFile?.url ?? getSongFileUrl(songId!, fileName);
       url = (await getCachedFileUrl(String(cachedEvent!.id), publicUrl)) ?? publicUrl;
     } else {
       url = getPublicUrl(fileName);
     }
     if (isPdf(fileName)) {
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      setPdfIsIOS(isIOS);      
-      setPdfUrl(url);
-      // Si pas d'audio en cours mais qu'il y en a de disponibles, préparer le bouton note
-      if (!audioUrl && files.some((f) => isAudio(f.name))) setPdfAudioReady(true);
+      handleOpenPdf(url);
     } else if (isAudio(fileName)) {
       setAudioUrl(url);
       setAudioName(fileName.split('.').slice(0, -1).join('.'));
@@ -628,7 +635,7 @@ export default function SongPage() {
                         }}
                       />
                     )}
-                    {isOwner && (
+                    {isOwner && f.source !== 'external' && (
                       <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => handleDeleteFile(f.name)} />
                     )}
                   </div>
@@ -679,39 +686,34 @@ export default function SongPage() {
         </>
       )}
 
-      {/* Overlay PDF plein écran */}
-      {pdfUrl && (
+      {/* Overlay PDF plein écran — pages rendues en images */}
+      {(pdfPages.length > 0 || pdfLoading) && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          width: '100%', height: '100%',
           backgroundColor: '#0A1F44', zIndex: 1000,
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
-          overflowX: 'hidden', // ← ajouter
         }}>
-          {/* Barre du haut : bouton fermer + lecteur audio si actif ou disponible */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', gap: '0.5rem' }}>
-            <button onClick={() => { setPdfUrl(null); setPdfAudioReady(false); setAudioUrl(null); setAudioName(''); }}
-              style={{ color: '#044C8D', padding: '0.4rem 0.8rem', fontSize: '1rem', background: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {/* Barre du haut */}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', gap: '0.5rem', flexShrink: 0 }}>
+            <button
+              onClick={() => { setPdfPages([]); setPdfAudioReady(false); setAudioUrl(null); setAudioName(''); }}
+              style={{ padding: '0.4rem 0.8rem', fontSize: '1rem', background: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', color: '#044C8D' }}
+            >
               ✕ Fermer
             </button>
-            {/* Lecteur audio : affiché si un audio est en cours OU si des audios sont disponibles */}
             {(audioUrl || pdfAudioReady) && (
               <>
                 {audioUrl ? (
-                  // Lecteur audio actif
                   <audio ref={audioRef} controls autoPlay loop src={audioUrl} style={{ flex: 1, height: '35px', minWidth: 0 }} />
                 ) : (
-                  // Invitation à sélectionner un audio
                   <span style={{ flex: 1, color: 'white', fontSize: '0.9rem', paddingLeft: '0.5rem' }}>Sélectionnez un audio ↓</span>
                 )}
-                {/* Bouton note → menu déroulant sélection audio */}
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => setShowAudioSelect(!showAudioSelect)}
                     style={{ height: '35px', width: '35px', borderRadius: '8px', border: 'none', backgroundColor: 'white', color: 'black', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <i className="fa fa-music"></i>
                   </button>
-                  {/* Liste des fichiers audio disponibles */}
                   {showAudioSelect && (
                     <div style={{ position: 'absolute', top: '40px', right: 0, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', overflow: 'hidden', minWidth: '180px', zIndex: 1001 }}>
                       {files.filter((f) => isAudio(f.name)).map((f) => (
@@ -729,50 +731,29 @@ export default function SongPage() {
             )}
           </div>
 
-          {/* Deuxième ligne iOS : ouvrir dans un autre onglet */}
-          {pdfIsIOS && pdfUrl && (
-            <div style={{ display: 'flex', padding: '0 0.5rem 0.5rem 0.5rem', flexDirection: 'column', gap: '0.4rem' }}>
-              <button
-                onClick={() => {
-                  // Retrouver le fileName depuis pdfUrl
-                  const fileName = files.find(f => getPublicUrl(f.name) === pdfUrl)?.name;
-                  if (fileName) handleGenerateLivret(fileName);
-                }}
-                disabled={isGeneratingPdf}
-                style={{
-                  padding: '0.4rem 0.8rem', fontSize: '0.9rem',
-                  background: 'white', border: 'none', borderRadius: '8px',
-                  cursor: 'pointer', color: '#044C8D',
-                }}
-              >
-                <i className="fa fa-file-pdf" style={{ marginRight: '0.4rem' }}></i>
-                {isGeneratingPdf ? 'Génération...' : 'Télécharger le PDF (si pb sous iOS)'}
-              </button>
-              {pdfGenerateError && (
-                <p style={{ color: '#DA486D', fontSize: '0.8rem', margin: 0 }}>{pdfGenerateError}</p>
-              )}
-            </div>
-          )}
-
-          {/* Iframe PDF */}
-          <iframe
-            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-            style={{
-              flex: 1,
-              border: 'none',
-              width: '100%',
-              display: 'block',
-              // Correctifs iOS : forcer la largeur à la largeur du viewport
-              maxWidth: '100vw',
-              minWidth: 0,
-            }}
-            title="Partition"
-          />
+          {/* Contenu : spinner ou pages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+            {pdfLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <div className="spinner"></div>
+              </div>
+            ) : pdfError ? (
+              <p style={{ color: '#DA486D', padding: '1rem' }}>{pdfError}</p>
+            ) : (
+              pdfPages.map((src, i) => (
+                <img key={i} src={src} alt={`Page ${i + 1}`} style={{
+                  width: '100%', display: 'block',
+                  marginBottom: i < pdfPages.length - 1 ? '0.5rem' : 0,
+                  borderRadius: '4px',
+                }} />
+              ))
+            )}
+          </div>
         </div>
-      )}
+      )}      
 
       {/* Popup flottant lecteur audio (uniquement si PDF non ouvert) */}
-      {audioUrl && !pdfUrl && (
+      {audioUrl && pdfPages.length === 0 && !pdfLoading && (
         <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', backgroundColor: '#044C8D', color: 'white', borderRadius: '12px', padding: '0.8rem 1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, minWidth: '280px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{audioName}</span>

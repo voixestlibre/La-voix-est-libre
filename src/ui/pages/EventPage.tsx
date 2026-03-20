@@ -37,22 +37,69 @@ export default function EventPage() {
       const cachedEvent = getCachedEvent();
       const isThisEventCached = cachedEvent && String(cachedEvent.id) === String(eventId);
   
+      // Page de garde — avant la boucle sur les chants
+      try {
+        const { rgb } = await import('pdf-lib');
+        const coverPage = mergedPdf.addPage([595, 842]); // A4
+
+        // Logo
+        const logoB64 = localStorage.getItem('app_logo_b64');
+        if (logoB64) {
+          const logoBytes = Uint8Array.from(atob(logoB64.split(',')[1]), c => c.charCodeAt(0));
+          const logoImage = await mergedPdf.embedPng(logoBytes);
+          const logoDims = logoImage.scaleToFit(200, 200);
+          coverPage.drawImage(logoImage, {
+            x: (595 - logoDims.width) / 2,
+            y: 842 - 150 - logoDims.height,
+            width: logoDims.width,
+            height: logoDims.height,
+          });
+        }
+
+        // Nom de l'événement
+        const { StandardFonts } = await import('pdf-lib');
+        const font = await mergedPdf.embedFont(StandardFonts.HelveticaBold);
+        const fontRegular = await mergedPdf.embedFont(StandardFonts.Helvetica);
+
+        coverPage.drawText(event.name, {
+          x: 50,
+          y: 400,
+          size: 28,
+          font,
+          color: rgb(0.02, 0.30, 0.55), // #044C8D
+        });
+
+        // Date
+        const dateStr = formatDate(event.event_date);
+        if (dateStr) {
+          coverPage.drawText(dateStr, {
+            x: 50,
+            y: 360,
+            size: 16,
+            font: fontRegular,
+            color: rgb(0.4, 0.4, 0.4),
+          });
+        }
+      } catch {
+        // Page de garde non générée → on continue sans
+      }          
+
       for (let i = 0; i < songs.length; i++) {
         const song = songs[i];
         setPdfProgress({ done: i, total: songs.length });
   
         try {
           // Récupérer les fichiers du chant
-          let pdfFiles: { name: string }[] = [];
+          let pdfFiles: { name: string; url?: string }[] = [];
   
           if (isThisEventCached && cachedEvent?.cached_files) {
             // Offline : utiliser les fichiers du cache
             pdfFiles = cachedEvent.cached_files
               .filter((f) => String(f.songId) === String(song.id) && f.fileName.toLowerCase().endsWith('.pdf'))
-              .map((f) => ({ name: f.fileName }));
+              .map((f) => ({ name: f.fileName, url: f.url }));
           } else {
             // Online : récupérer depuis Supabase
-            const allFiles = await getSongFiles(String(song.id));
+            const allFiles = await getSongFiles(String(song.id), song.title, song.code ?? undefined);
             pdfFiles = allFiles.filter((f: any) => f.name.toLowerCase().endsWith('.pdf'));
           }
   
@@ -63,13 +110,16 @@ export default function EventPage() {
   
               if (isThisEventCached && cachedEvent) {
                 // Offline : récupérer depuis le cache
-                const publicUrl = getSongFileUrl(String(song.id), pdfFile.name);
+                const cachedFileEntry = cachedEvent.cached_files?.find(
+                  (f) => String(f.songId) === String(song.id) && f.fileName === pdfFile.name
+                );
+                const publicUrl = cachedFileEntry?.url ?? getSongFileUrl(String(song.id), pdfFile.name);
                 const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
                 const url = cachedUrl ?? publicUrl;
                 pdfBytes = await fetch(url).then((r) => r.arrayBuffer());
               } else {
-                // Online : récupérer depuis Supabase
-                const url = getSongFileUrl(String(song.id), pdfFile.name);
+                // Online : récupérer depuis Supabase ou externe
+                const url = pdfFile.url ?? getSongFileUrl(String(song.id), pdfFile.name);
                 pdfBytes = await fetch(url).then((r) => r.arrayBuffer());
               }
   

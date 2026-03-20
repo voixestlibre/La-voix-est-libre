@@ -1,5 +1,6 @@
 // infrastructure/songsService.ts
 import { supabase } from './supabaseClient';
+export const EXTERNAL_SONG_BASE_URL = 'https://www.larminat.fr/petitchoeur/';
 
 // Convertir un tableau de hashtags en chaîne pour stockage
 const hashtagsToString = (hashtags: string[]) => hashtags.join(',');
@@ -13,7 +14,7 @@ export async function createSong(choirId: string, title: string, hashtags: strin
   const normalizedCode = code ? code.trim().toUpperCase() : null;
   const { data, error } = await supabase
     .from('songs')
-    .insert([{ choir_id: choirId, title, hashtags: hashtagsToString(hashtags), normalizedCode }])
+    .insert([{ choir_id: choirId, title, hashtags: hashtagsToString(hashtags), code: normalizedCode }])
     .select()
     .single();
   if (error) throw error;
@@ -32,13 +33,48 @@ export async function getSong(songId: string) {
   return { ...data, hashtags: stringToHashtags(data.hashtags) };
 }
 
-// Lister les fichiers d'un chant
-export async function getSongFiles(songId: string) {
-  const { data, error } = await supabase.storage
+// Lister les fichiers d'un chant, Supabase + externe
+export async function getSongFiles(songId: string, songTitle?: string, code?: string) {
+  const files: { name: string; url: string; source: 'supabase' | 'external' }[] = [];
+
+  // 1️⃣ fichiers Supabase
+  const { data: supaFiles, error } = await supabase.storage
     .from('songs-files')
     .list(songId);
+
   if (error) throw error;
-  return data || [];
+
+  if (supaFiles) {
+    for (const f of supaFiles) {
+      files.push({
+        name: f.name,
+        url: getSongFileUrl(songId, f.name), 
+        source: 'supabase'
+      });
+    }
+  }
+
+  // 2️⃣ fichiers externes
+  if (code && songTitle) {
+    const externalFiles = generateExternalFiles(songTitle, code);
+
+    const externalResults = await Promise.all(
+      externalFiles.map(async ({ name, urlSuffix }) => {
+        const url = `${EXTERNAL_SONG_BASE_URL}${code}/${name}`;
+
+        if (await urlExists(url)) {
+          return {
+            name: urlSuffix,   // nom lisible
+            url,               // URL réelle
+            source: 'external' as const
+          };
+        }
+        return null;
+      })
+    );
+    files.push(...externalResults.filter(Boolean) as typeof files);
+  }
+  return files;
 }
 
 // Vérifier si un fichier existe déjà
@@ -65,11 +101,54 @@ export async function deleteSongFile(songId: string, fileName: string) {
 }
 
 // Obtenir l'URL publique d'un fichier
-export function getSongFileUrl(songId: string, fileName: string) {
-  const { data } = supabase.storage
-    .from('songs-files')
-    .getPublicUrl(`${songId}/${fileName}`);
-  return data.publicUrl;
+export function getSongFileUrl(songId: string, fileName: string, code?: string) {
+  // Si aucun code, on reste sur Supabase
+  if (!code) {
+    const { data } = supabase.storage
+      .from('songs-files')
+      .getPublicUrl(`${songId}/${fileName}`);
+    return data.publicUrl;
+  }
+
+  // Gestion des fichiers externes : convertir fileName affiché en nom réel
+  let realName = "";
+
+  // Exemple PDF
+  const pageMatch = fileName.match(/- Page (\d+)/);
+  if (fileName.endsWith(".pdf")) {
+    if (!pageMatch) {
+      realName = `${code}.pdf`;
+    } else {
+      realName = `${code}-${pageMatch[1]}.pdf`;
+    }
+  }
+
+  // Exemple MP3
+  else if (fileName.endsWith(".mp3")) {
+    const mp3Map: Record<string, string> = {
+      "Alto": "A",
+      "Alto 2": "A2",
+      "Basse": "B",
+      "Basse 2": "B2",
+      "Soprano": "S",
+      "Tenor": "T",
+      "Tenor 2": "T2"
+    };
+    const roleMatch = fileName.match(/- (\w+(?: \d)?)\.mp3$/);
+    if (roleMatch) {
+      const suffix = mp3Map[roleMatch[1]];
+      if (suffix) {
+        realName = `${code}-${suffix}.mp3`;
+      }
+    }
+  }
+
+  if (!realName) {
+    // fallback pour sécurité
+    return "";
+  }
+
+  return `${EXTERNAL_SONG_BASE_URL}${code}/${realName}`;
 }
 
 
@@ -80,7 +159,9 @@ export async function deleteSong(songId: string) {
 
   // Supprimer tous les fichiers du bucket si il y en a
   if (files.length > 0) {
-    const filePaths = files.map((f) => `${songId}/${f.name}`);
+    const filePaths = files
+      .filter((f) => f.source === 'supabase')  // ← ignorer les fichiers externes
+      .map((f) => `${songId}/${f.name}`);
     const { error: storageError } = await supabase.storage
       .from('songs-files')
       .remove(filePaths);
@@ -114,7 +195,7 @@ export async function updateSong(songId: string, title: string, hashtags: string
   const normalizedCode = code ? code.trim().toUpperCase() : null;
   const { error } = await supabase
     .from('songs')
-    .update({ title, hashtags: hashtagsToString(hashtags), normalizedCode })
+    .update({ title, hashtags: hashtagsToString(hashtags), code: normalizedCode })
     .eq('id', songId);
   if (error) throw error;
 }
@@ -195,4 +276,42 @@ export async function toggleCommonSong(songId: string, isCommon: boolean) {
     .update({ is_common: isCommon })
     .eq('id', songId);
   if (error) throw error;
+}
+
+
+// Fichiers PDF et audio externes avec suffixes lisibles
+function generateExternalFiles(songTitle: string, code: string) {
+  const files: { name: string, urlSuffix: string }[] = [];
+
+  // PDFs
+  files.push({ name: `${code}.pdf`, urlSuffix: `${songTitle}.pdf` });
+  //for (let i = 1; i <= 20; i++) {
+    //files.push({ name: `${code}-${i}.pdf`, urlSuffix: `${songTitle} - Page ${i}.pdf` });
+  //}
+
+  // MP3s
+  const audioMap: Record<string, string> = {
+    'A': 'Alto',
+    'A2': 'Alto 2',
+    'B': 'Basse',
+    'B2': 'Basse 2',
+    'S': 'Soprano',
+    'T': 'Tenor',
+    'T2': 'Tenor 2',
+  };
+  for (const [suffix, readable] of Object.entries(audioMap)) {
+    files.push({ name: `${code}-${suffix}.mp3`, urlSuffix: `${songTitle} - ${readable}.mp3` });
+  }
+
+  return files;
+}
+
+// Vérifier si une URL existe
+async function urlExists(url: string) {
+  try {
+    const res = await fetch(url, { method: 'HEAD' });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

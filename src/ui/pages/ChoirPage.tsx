@@ -489,7 +489,22 @@ export default function ChoirPage() {
                         })}                        
                         style={{ cursor: 'pointer' }}
                         >
-                        <strong>{s.title}</strong>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <strong>{s.title}</strong>
+                          {s.code && (
+                            <span style={{
+                              fontSize: '0.7rem',
+                              backgroundColor: '#eee',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '6px',
+                              color: '#555',
+                            }}>
+                              {s.code}
+                            </span>
+                          )}
+                        </div>
+
                         {s.hashtags?.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
                             {s.hashtags.map((tag: string) => (
@@ -546,7 +561,20 @@ export default function ChoirPage() {
                               })}
                               style={{ cursor: 'pointer' }}
                               >
-                              <strong>{s.title}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <strong>{s.title}</strong>
+                                {s.code && (
+                                  <span style={{
+                                    fontSize: '0.7rem',
+                                    backgroundColor: '#eee',
+                                    padding: '0.15rem 0.4rem',
+                                    borderRadius: '6px',
+                                    color: '#555',
+                                  }}>
+                                    {s.code}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             {/* Icône delete — propriétaire uniquement */}
                             {isOwner && (

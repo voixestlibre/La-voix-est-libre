@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import logoUrl from './assets/logo.png';
 import HomePage from './ui/pages/HomePage';
 import ChoirCreationPage from './ui/pages/ChoirCreationPage';
 import ChoirsListPage from './ui/pages/ChoirsListPage';
@@ -29,6 +31,20 @@ if ('serviceWorker' in navigator) {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Précharger le logo en base64 pour usage offline
+    fetch(logoUrl)
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          localStorage.setItem('app_logo_b64', reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <BrowserRouter basename={import.meta.env.VITE_BASENAME ?? '/'}>
       <Routes>
