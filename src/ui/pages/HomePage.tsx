@@ -17,6 +17,19 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearch, setShowSearch] = useState(false);
 
+  const [logoSrc, setLogoSrc] = useState(logo);
+
+  // Gestion du logo (offline / online)
+  useEffect(() => {
+    const handleOffline = () => {
+      const cached = localStorage.getItem('app_logo_b64');
+      if (cached) setLogoSrc(cached);
+    };
+    if (!navigator.onLine) handleOffline();
+    window.addEventListener('offline', handleOffline);
+    return () => window.removeEventListener('offline', handleOffline);
+  }, []);  
+
   // Vérifie si un utilisateur est connecté
   useEffect(() => {
     const getUser = async () => {
@@ -156,7 +169,7 @@ export default function HomePage() {
 
       {/* Logo */}
       <div style={{ margin: '30px 0' }}>
-        <img src={logo} alt="La voix est libre" className="page-logo" />
+        <img src={logoSrc} alt="La voix est libre" className="page-logo" />
       </div>
   
       {/* Boutons */}

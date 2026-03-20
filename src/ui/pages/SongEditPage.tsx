@@ -163,14 +163,16 @@ export default function SongEditPage() {
             className="page-form-input"
           />
 
-          {/* Code du chant (facultatif) */}
-          <input
-            type="text"
-            placeholder="Code (facultatif)"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="page-form-input"
-          />
+          {/* Code du chant (facultatif) — uniquement pour la chorale 32 */}
+          {String(resolvedChoirId) === '32' && (
+            <input
+              type="text"
+              placeholder="Code (facultatif)"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="page-form-input"
+            />
+          )}
 
           {/* Saisie des hashtags avec autocomplétion */}
           <div style={{ position: 'relative', margin: '0.5rem 0' }}>

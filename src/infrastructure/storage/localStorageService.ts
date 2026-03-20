@@ -15,9 +15,9 @@ export interface StoredEvent {
   choir_id: string;
   choir_name: string | null;
   event_date?: string | null;
-  songs: { id: string; title: string }[];
+  songs: { id: string; title: string; code?: string | null }[];
   is_cached?: boolean; // true si les fichiers de cet événement sont mémorisés localement
-  cached_files?: { songId: string; fileName: string }[];
+  cached_files?: { songId: string; fileName: string; url?: string }[];
   active?: boolean;
 }
 

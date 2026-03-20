@@ -89,7 +89,7 @@ export async function getEventSongsDetails(eventId: string) {
 
   const { data: songs, error: songsError } = await supabase
     .from('songs')
-    .select('id, title, hashtags')
+    .select('id, title, hashtags, code')
     .in('id', songIds);
   if (songsError) throw songsError;
 
@@ -173,7 +173,7 @@ export async function getEventsByCodes(codes: string[]) {
 }
 
 
-export async function getEventSongsTitles(eventId: string): Promise<{ id: string; title: string }[]> {
+export async function getEventSongsTitles(eventId: string): Promise<{ id: string; title: string; code: string | null }[]> {
   // Étape 1 : récupérer les song_ids de l'événement, ordonnés par position
   const { data: eventSongs, error: e1 } = await supabase
     .from('event_songs')
@@ -188,14 +188,14 @@ export async function getEventSongsTitles(eventId: string): Promise<{ id: string
   // Étape 2 : récupérer les titres des chants correspondants
   const { data: songs, error: e2 } = await supabase
     .from('songs')
-    .select('id, title')
+    .select('id, title, code')  
     .in('id', songIds);
   if (e2) throw e2;
 
   // Réordonner selon l'ordre de l'événement (l'étape 2 ne garantit pas l'ordre)
   return songIds
     .map((id: string) => songs.find((s: any) => s.id === id))
-    .filter((s): s is { id: string; title: string } => !!s);
+    .filter((s): s is { id: string; title: string; code: string | null } => !!s);
 }
 
 

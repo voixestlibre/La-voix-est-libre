@@ -5,7 +5,7 @@
   import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
   import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
   import { cacheEventFiles, clearEventCache } from '../../infrastructure/storage/cacheService';
-  import { getSongFiles, getSongFileUrl } from '../../infrastructure/storage/songsService';
+  import { getSongFiles } from '../../infrastructure/storage/songsService';
   import { isCacheable } from '../../infrastructure/storage/cacheService';
   import '../../App.css';
   import TopBar from '../components/TopBar';
@@ -142,6 +142,7 @@
 
     // Clic sur l'icône download → afficher la bannière de confirmation
     const handleOfflineClick = async (eventId: string, eventName: string, songIds: string[]) => {
+      setDownloadReport(null);
       const alreadyCached = getCachedEvent();
     
       // Si cet événement est déjà mémorisé → désactiver (avec confirmation, sans infos fichiers)
@@ -177,13 +178,15 @@
       setCollecting(true);
       try {
         for (const songId of songIds) {
-          const files = await getSongFiles(songId);
+          const storedEvent = getStoredEvents().find((e) => String(e.id) === String(eventId));
+          const songData = storedEvent?.songs.find((s) => String(s.id) === String(songId));
+          const files = await getSongFiles(songId, songData?.title, songData?.code ?? undefined);
           for (const f of files) {
             if (isCacheable(f.name)) {
               fileCount++;
               // Récupérer la taille via une requête HEAD
               try {
-                const res = await fetch(getSongFileUrl(songId, f.name), { method: 'HEAD' });
+                const res = await fetch(f.url, { method: 'HEAD' });
                 const size = res.headers.get('content-length');
                 if (size) totalSizeKb += Math.round(parseInt(size) / 1024);
               } catch {
@@ -224,11 +227,13 @@
         return;
       }
 
-      // Supprimer tous les caches de tous les événements connus
+      // Supprimer tous les caches de tous les événements, connus ou non
       // (nettoyage complet pour éviter tout fichier orphelin)
-      const allStoredEvents = getStoredEvents();
-      for (const ev of allStoredEvents) {
-        await clearEventCache(String(ev.id));
+      const allCacheKeys = await caches.keys();
+      for (const key of allCacheKeys) {
+        if (key.startsWith('event-files-')) {
+          await caches.delete(key);
+        }
       }
       clearCachedEventId();
 
@@ -240,13 +245,15 @@
         // Collecter tous les fichiers PDF de tous les chants de l'événement
         const allFiles: { name: string; url: string; songId: string; songTitle: string }[] = [];
         for (const songId of newSongIds) {
-          const files = await getSongFiles(songId);
-          // Récupérer le titre du chant depuis le localStorage
           const storedEvent = getStoredEvents().find((e) => String(e.id) === String(newEventId));
-          const songTitle = storedEvent?.songs.find((s) => String(s.id) === String(songId))?.title ?? songId;
+          const songData = storedEvent?.songs.find((s) => String(s.id) === String(songId));
+          const songTitle = songData?.title ?? songId;
+          const songCode = songData?.code ?? undefined;
+          const files = await getSongFiles(songId, songTitle, songCode);
           for (const f of files) {
             if (isCacheable(f.name)) {
-              allFiles.push({ name: f.name, url: getSongFileUrl(songId, f.name), songId, songTitle });
+              allFiles.push({ name: f.name, url: f.url, songId, songTitle });
+              // ↑ utiliser f.url directement (contient déjà l'URL externe ou Supabase)
             }
           }
         }
@@ -272,7 +279,7 @@
         const stored = getStoredEvents();
         setStoredEvents(stored.map((e) =>
           String(e.id) === String(newEventId)
-            ? { ...e, cached_files: allFiles.map((f) => ({ songId: f.songId, fileName: f.name })) }
+          ? { ...e, cached_files: allFiles.map((f) => ({ songId: f.songId, fileName: f.name, url: f.url })) }
             : e
         ));        
       } catch {

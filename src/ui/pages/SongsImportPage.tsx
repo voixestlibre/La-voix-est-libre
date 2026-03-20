@@ -57,7 +57,7 @@ export default function ImportSongPage() {
     }
 
     // Créer le chant avec le nom du répertoire
-    const song = await createSong(choirId!, songTitle, []);
+    const song = await createSong(choirId!, songTitle, [], null);
     report.success = true;
 
     // Lire les fichiers du répertoire
