@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
-import { createSong, uploadSongFile, fileExists, songTitleExists, updateSong, getSong, getSongByTitle } from '../../infrastructure/storage/songsService';
+import { createSong, uploadSongFile, fileExists, updateSong, getSongByTitle } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 
