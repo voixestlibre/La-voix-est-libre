@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoirOwner, getChoir } from '../../infrastructure/storage/choirsService';
-import { getEvent, getEventSongsDetails } from '../../infrastructure/storage/eventsService';
+import { getEvent, getEventSongsDetails, incrementEventViews } from '../../infrastructure/storage/eventsService';
 import { getCachedEvent, getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import { PDFDocument } from 'pdf-lib';
 import { getSongFiles, getSongFileUrl } from '../../infrastructure/storage/songsService';
@@ -229,6 +229,9 @@ export default function EventPage() {
         // Récupérer les chants associés à l'événement
         const songsData = await getEventSongsDetails(eventId!);
         setSongs(songsData);
+
+        // Incrémenter le compteur de vues        
+        incrementEventViews(String(eventId)).catch(() => {});
 
       } catch {
         // ── Fallback offline ─────────────────────────────────────────────
