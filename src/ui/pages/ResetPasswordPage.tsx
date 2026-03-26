@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { setSessionFromHash, resetPassword } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData'; 
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -12,6 +13,7 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -48,7 +50,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="login" helpProfiles={helpProfiles} />
       <h2>Réinitialisation du mot de passe</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

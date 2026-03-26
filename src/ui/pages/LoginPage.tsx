@@ -4,6 +4,7 @@ import { getCurrentUser, login, signOut } from '../../infrastructure/storage/aut
 import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [user, setUser] = useState<{ email: string; isAdmin: boolean } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
   // Vérifier si l'utilisateur est déjà connecté au chargement
   useEffect(() => {
@@ -60,7 +62,7 @@ export default function LoginPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="login" helpProfiles={helpProfiles} />
 
       {pageLoading || loading ? <div className="spinner"></div> : (
         <>

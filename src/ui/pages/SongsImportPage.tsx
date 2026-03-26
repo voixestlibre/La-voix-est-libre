@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { createSong, uploadSongFile, fileExists, updateSong, getSongByTitle } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 type ImportReport = {
   songTitle: string;
@@ -21,6 +22,23 @@ export default function ImportSongPage() {
   const [importing, setImporting] = useState(false);
   const [reports, setReports] = useState<ImportReport[]>([]);
   const [error, setError] = useState('');
+  const [pageLoading, setPageLoading] = useState(true);
+
+  const [helpProfiles] = useState<UserProfile[]>(['owner']);
+
+  // Redirection si l'utilisateur n'est pas le propriétaire de la chorale
+  useEffect(() => {
+    const checkAccess = async () => {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) { navigate('/'); return; }
+      const ownerId = await getChoirOwner(choirId!);
+      if (ownerId !== currentUser.id) {
+        navigate(`/choir/${choirId}`, { replace: true });
+      }
+      setPageLoading(false);
+    };
+    checkAccess();
+  }, [choirId, navigate]);
 
   // Vérifier si un fichier est audio ou pdf
   const isValidFile = (name: string) => {
@@ -175,9 +193,20 @@ export default function ImportSongPage() {
     setImporting(false);
   };
 
+  // Pendant le chargement de la page
+  if (pageLoading) {
+    return (
+      <div className="page-container">
+        <TopBar />
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
   return (
+    // Quand la page est chargée
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="songs-import" helpProfiles={helpProfiles} />
       <h2>Importer des chants</h2>
       {reports.length === 0 && <div><p>Déposez un ou plusieurs répertoires contenant les fichiers audio et PDF.</p><p>Le nom de chaque répertoire sera utilisé pour créer un chant, et les différents fichiers audio ou pdf des répertoires seront associés aux chants correspondants...</p></div>}
 

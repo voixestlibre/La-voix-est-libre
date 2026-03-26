@@ -5,6 +5,7 @@ import { getEventByCode, getEventsByChoirIds, getEventSongsTitles } from '../../
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function ChoirJoinPage() {
   const [groups, setGroups] = useState<string[]>(['', '', '', '']);
@@ -12,6 +13,7 @@ export default function ChoirJoinPage() {
   const [loading, setLoading] = useState(false);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
+  const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
   // Gestion de la saisie : chiffres uniquement, passage auto au groupe suivant
   const handleChange = (index: number, value: string) => {
@@ -116,7 +118,7 @@ export default function ChoirJoinPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="choir-join" helpProfiles={helpProfiles} />
 
       <h2>Rejoindre une chorale</h2>
       <p>Renseignez le code de la chorale que vous souhaitez rejoindre :</p>

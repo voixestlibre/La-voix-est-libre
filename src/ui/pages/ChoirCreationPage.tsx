@@ -6,6 +6,7 @@ import { createChoir, countOwnedChoirs } from '../../infrastructure/storage/choi
 import { getStoredChoirs, setStoredChoirs } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function CreationPage() {
   const [choraleName, setChoraleName] = useState('');
@@ -15,6 +16,7 @@ export default function CreationPage() {
   const [canCreate, setCanCreate] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
   const navigate = useNavigate();
+  const [helpProfiles] = useState<UserProfile[]>(['owner']);
 
   useEffect(() => {
     const init = async () => {
@@ -63,7 +65,7 @@ export default function CreationPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="choir-creation" helpProfiles={helpProfiles} />
       <h2>Créer une chorale</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

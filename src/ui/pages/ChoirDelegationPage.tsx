@@ -4,6 +4,7 @@ import { getCurrentUser, createDelegateAccount, getChoirDelegates, revokeDelegat
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function ChoirDelegationPage() {
   const { choirId } = useParams();
@@ -15,6 +16,7 @@ export default function ChoirDelegationPage() {
   const [success, setSuccess] = useState(false);
   const [delegates, setDelegates] = useState<string[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
+  const [helpProfiles] = useState<UserProfile[]>(['owner']);
 
   useEffect(() => {
     const init = async () => {
@@ -75,7 +77,7 @@ export default function ChoirDelegationPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="choir-delegation" helpProfiles={helpProfiles} />
       <h2>Donner délégation</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

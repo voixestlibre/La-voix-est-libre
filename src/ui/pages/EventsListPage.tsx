@@ -9,6 +9,7 @@
   import { isCacheable } from '../../infrastructure/storage/cacheService';
   import '../../App.css';
   import TopBar from '../components/TopBar';
+  import { type UserProfile } from '../components/helpData';
 
   type ConfirmBanner = {
     newEventId: string;
@@ -34,13 +35,17 @@
     const [delegatedChoirIds, setDelegatedChoirIds] = useState<string[]>([]);
     const [explicitChoirIds, setExplicitChoirIds] = useState<string[]>([]);
 
+    const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
+
     useEffect(() => {
       const fetchData = async () => {
         const currentUser = await getCurrentUser();
+        let localDelegations: string[] = [];
         if (currentUser) {
           const paramId = await getUserParamId(currentUser.email!);
           setUserParamId(paramId);
           const delegations = await getUserDelegations(currentUser.email!);
+          localDelegations = delegations;
           setDelegatedChoirIds(delegations);
         }
         const storedChoirs = getStoredChoirs();
@@ -48,9 +53,10 @@
         const storedEvents = getStoredEvents();
         const storedCodes = storedEvents.map((e) => String(e.code));
 
+        let ownedIds: string[] = [];
+
         try {
-          const allValidEvents: any[] = [];
-          let ownedIds: string[] = [];
+          const allValidEvents: any[] = [];          
 
           // PARTIE 1 : événements des chorales propriétaires (si connecté)
           if (currentUser) {
@@ -123,6 +129,21 @@
           );
           setEvents(sortedStoredEvents);
         }
+
+        // Construire les profils d'aide
+        const profiles: UserProfile[] = [];
+        if (!currentUser) {
+          if (getStoredChoirs().length > 0) profiles.push('member');
+          else if (getStoredEvents().length > 0) profiles.push('guest');
+          else profiles.push('anonymous');
+        } else {
+          if (ownedIds.length > 0) profiles.push('owner');
+          else if (localDelegations.length > 0) profiles.push('delegate');
+          else if (getStoredChoirs().length > 0) profiles.push('member');
+          else if (getStoredEvents().length > 0) profiles.push('guest');
+          else profiles.push('anonymous');
+        }
+        setHelpProfiles(profiles);
 
         setLoading(false);
       };
@@ -304,7 +325,7 @@
 
     return (
       <div className="page-container">
-        <TopBar />
+        <TopBar helpPage="my-events" helpProfiles={helpProfiles} />
         <h2>Mes événements</h2>
 
         {/* Indicateur de collecte des infos fichiers */}

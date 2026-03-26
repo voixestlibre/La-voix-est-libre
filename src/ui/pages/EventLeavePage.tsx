@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getEvent } from '../../infrastructure/storage/eventsService';
-import { getStoredEvents, removeStoredEvent, getCachedEvent, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
+import { getStoredChoirs, getStoredEvents, removeStoredEvent, getCachedEvent, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
+import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import { clearEventCache } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function LeaveEventPage() {
   const { eventId } = useParams();
@@ -13,6 +15,7 @@ export default function LeaveEventPage() {
   const [eventName, setEventName] = useState('');
   const [choirId, setChoirId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [helpProfiles] = useState<UserProfile[]>(['guest']);
 
   useEffect(() => {
     const init = async () => {
@@ -29,7 +32,29 @@ export default function LeaveEventPage() {
         const data = await getEvent(eventId!);
         setEventName(data.name);
         setChoirId(String(data.choir_id));
+      
+        // Vérifier que l'utilisateur est bien un guest (a rejoint l'événement directement)
+        // et non un membre de la chorale de rattachement
+        const storedChoirs = getStoredChoirs();
+        const isChoirMember = storedChoirs.some((c) => String(c.id) === String(data.choir_id));
+
+        // Vérifier si propriétaire
+        const currentUser = await getCurrentUser();
+        const ownerId = await getChoirOwner(String(data.choir_id));
+        const isOwner = currentUser && ownerId === currentUser.id;
+
+        if (isOwner || isChoirMember) {
+          // Pas un guest → rediriger vers la page de la chorale
+          navigate(`/choir/${data.choir_id}`, { replace: true });
+          return;
+        }
       } catch {
+        const storedChoirs = getStoredChoirs();
+        const isChoirMember = storedChoirs.some((c) => String(c.id) === String(found.choir_id));
+        if (isChoirMember) {
+          navigate(`/choir/${found.choir_id}`, { replace: true });
+          return;
+        }
         // Fallback offline : chercher dans le localStorage
         setEventName(found.name);
         setChoirId(String(found.choir_id));
@@ -63,7 +88,7 @@ export default function LeaveEventPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="event-leave" helpProfiles={helpProfiles} />
       <h2>Quitter un événement</h2>
 
       {loading ? <div className="spinner"></div> : (

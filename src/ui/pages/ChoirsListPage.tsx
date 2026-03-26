@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParam, getUserDelegations } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function MyChoirsPage() {
   const [user, setUser] = useState<any>(null);
@@ -19,6 +20,8 @@ export default function MyChoirsPage() {
   const [loading, setLoading] = useState(true);
   const [canCreate, setCanCreate] = useState(false);
   const navigate = useNavigate();
+  // Profils pour l'aide
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -247,6 +250,35 @@ export default function MyChoirsPage() {
         setGhostChoirs(ghosts);
       }
 
+      // Construire les profils d'aide
+      const profiles: UserProfile[] = [];
+      const storedCh = getStoredChoirs();
+      const storedEv = getStoredEvents();
+      
+      if (!currentUser) {
+        // Non connecté — mais peut quand même avoir des chorales ou événements
+        if (storedCh.length > 0) profiles.push('member');
+        else if (storedEv.length > 0) profiles.push('guest');
+        else profiles.push('anonymous');
+      } else {
+        // Connecté
+        const ownedIds = allLoadedChoirs
+          .filter((c: any) => c.owner_id === currentUser.id)
+          .map((c: any) => c.id);
+        const param = await getUserParam(currentUser.email!).catch(() => null);
+        if (ownedIds.length > 0 || (param && param.choirs_nb > 0)) profiles.push('owner');
+      
+        try {
+          const delegations = await getUserDelegations(currentUser.email!);
+          if (delegations.length > 0) profiles.push('delegate');
+        } catch {}
+      
+        if (storedCh.length > 0) profiles.push('member');
+        if (storedEv.length > 0 && storedCh.length === 0) profiles.push('guest');
+        if (profiles.length === 0) profiles.push('member');
+      }
+      setHelpProfiles(profiles);
+
       setLoading(false);
     };
 
@@ -263,7 +295,7 @@ export default function MyChoirsPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="my-choirs" helpProfiles={helpProfiles} />
       <h2>Mes chorales</h2>
 
       {loading ? (

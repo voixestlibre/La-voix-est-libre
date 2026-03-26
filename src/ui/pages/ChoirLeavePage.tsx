@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getChoir } from '../../infrastructure/storage/choirsService';
+import { getCurrentUser, getUserDelegations } from '../../infrastructure/storage/authService';
 import { getStoredChoirs, setStoredChoirs, removeStoredEventsByChoirId } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function LeaveChoirPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [choirName, setChoirName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -22,10 +25,34 @@ export default function LeaveChoirPage() {
       try {
         const data = await getChoir(id!);
         setChoirName(data.name);
+        // Rediriger le propriétaire vers la page de la chorale
+        const currentUser = await getCurrentUser();
+        if (currentUser && data.owner_id === currentUser.id) {
+          navigate(`/choir/${id}`, { replace: true });
+          return;
+        }        
       } catch {
         // Fallback offline
         setChoirName(found.name);
       }
+      
+      // Construire les profils d'aide
+      try {
+        const currentUser = await getCurrentUser();
+        if (currentUser) {
+          const delegations = await getUserDelegations(currentUser.email!);
+          if (delegations.includes(String(id))) {
+            setHelpProfiles(['delegate']);
+          } else {
+            setHelpProfiles(['member']);
+          }
+        } else {
+          setHelpProfiles(['member']);
+        }
+      } catch {
+        setHelpProfiles(['member']);
+      }      
+
       setLoading(false); 
     };
     init();
@@ -44,7 +71,7 @@ export default function LeaveChoirPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="choir-leave" helpProfiles={helpProfiles} />
       <h2>Quitter une chorale</h2>
       {loading ? <div className="spinner"></div> : (
         <>
