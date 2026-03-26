@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; 
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
@@ -7,6 +7,7 @@ import { getChoirEvents, toggleEventActive } from '../../infrastructure/storage/
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function ChoirPage() {
   const { id } = useParams();
@@ -28,6 +29,8 @@ export default function ChoirPage() {
   type FilterState = 'all' | 'true' | 'false';
   const [filterCommon, setFilterCommon] = useState<FilterState>('all');
   const [filterFavorite, setFilterFavorite] = useState<FilterState>('all');
+
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     const fetchChoir = async () => {
@@ -61,6 +64,8 @@ export default function ChoirPage() {
       const allowedEventCodes = joinedEvents
         .filter((e: any) => String(e.choir_id) === String(id))
         .map((e: any) => String(e.code));
+      
+      let ownerCheckLocal = false;
 
       try {
         // Récupérer la chorale depuis Supabase
@@ -69,6 +74,7 @@ export default function ChoirPage() {
 
         // Vérifier si l'utilisateur connecté est le propriétaire
         const ownerCheck = currentUser && data.owner_id === currentUser.id;
+        ownerCheckLocal = !!ownerCheck;
         setIsOwner(!!ownerCheck);
         if (ownerCheck) setActiveTab('songs');
 
@@ -147,6 +153,22 @@ export default function ChoirPage() {
         // Pas de chants accessibles offline (les fichiers ne sont pas en cache)
         setSongs([]);
       }
+
+      // Construire les profils d'aide — déterminés par rapport à cette chorale spécifique
+      const profiles: UserProfile[] = [];
+      if (!currentUser) {
+        if (isInJoinedChoirs) profiles.push('member');
+        else if (hasDirectEvent) profiles.push('guest');
+        else profiles.push('anonymous');
+      } else {
+        // Utiliser les variables déjà calculées dans ce useEffect
+        if (ownerCheckLocal) profiles.push('owner');
+        else if (delegations.includes(String(id))) profiles.push('delegate');
+        else if (isInJoinedChoirs) profiles.push('member');
+        else if (hasDirectEvent) profiles.push('guest');
+        else profiles.push('anonymous');
+      }
+      setHelpProfiles(profiles);      
 
       setLoading(false);
     };
@@ -235,7 +257,7 @@ export default function ChoirPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="choir" helpProfiles={helpProfiles} />
       {loading ? <div className="spinner"></div> : (
         <>
           <h2>
@@ -389,7 +411,7 @@ export default function ChoirPage() {
                       fontSize: '0.85rem', fontWeight: groupByHashtag ? 'bold' : 'normal',
                     }}
                   >
-                    <i className="fa fa-hashtag"></i> &nbsp; Par hashtag
+                    <i className="fa fa-hashtag"></i> &nbsp; Par hashtags
                   </button>
                 </div>
               )}

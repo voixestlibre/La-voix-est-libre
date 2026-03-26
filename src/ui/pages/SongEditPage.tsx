@@ -10,6 +10,7 @@ import {
 } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function SongEditPage() {
   // choirId présent → mode création, songId présent → mode modification
@@ -30,6 +31,8 @@ export default function SongEditPage() {
 
   // URL de retour : page du chant en mode édition, page de la chorale en mode création
   const backUrl = isEditing ? `/song/${songId}` : `/choir/${resolvedChoirId}`;
+
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -69,6 +72,10 @@ export default function SongEditPage() {
         setAllHashtags(known);
         setPageLoading(false);
       }
+
+      // Construire les profils d'aide — owner uniquement sur cette page
+      setHelpProfiles(['owner']);
+
     };
     init();
   }, [choirId, songId, navigate, isEditing]);
@@ -148,7 +155,7 @@ export default function SongEditPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="song-edit" helpProfiles={helpProfiles} />
       <h2>{isEditing ? 'Modifier un chant' : 'Ajouter un chant'}</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

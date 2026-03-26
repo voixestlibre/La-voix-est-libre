@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { getCurrentUser, requestPasswordReset } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function RequestResetPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
   useEffect(() => {
     const getUser = async () => {
@@ -33,7 +35,7 @@ export default function RequestResetPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="login" helpProfiles={helpProfiles} />
       <h2>Réinitialiser le mot de passe</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

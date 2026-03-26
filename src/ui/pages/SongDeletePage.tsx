@@ -4,6 +4,7 @@ import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getSong, deleteSong } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function DeleteSongPage() {
   const { id: songId } = useParams();
@@ -12,6 +13,7 @@ export default function DeleteSongPage() {
   const [choirId, setChoirId] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [helpProfiles] = useState<UserProfile[]>(['owner']);
 
   useEffect(() => {
     const fetchSong = async () => {
@@ -48,7 +50,7 @@ export default function DeleteSongPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="song-delete" helpProfiles={helpProfiles} />
       <h2>Supprimer un chant</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

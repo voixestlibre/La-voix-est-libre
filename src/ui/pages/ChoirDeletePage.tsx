@@ -6,6 +6,7 @@ import { countChoirSongs } from '../../infrastructure/storage/songsService';
 import { removeStoredChoir, removeStoredEventsByChoirId } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function DeleteChoirPage() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export default function DeleteChoirPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [helpProfiles] = useState<UserProfile[]>(['owner']);
 
   useEffect(() => {
     const fetchChoir = async () => {
@@ -74,7 +76,7 @@ export default function DeleteChoirPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="choir-delete" helpProfiles={helpProfiles} />
       <h2>Supprimer une chorale</h2>
       {pageLoading || loading ? <div className="spinner"></div> : (
         <>

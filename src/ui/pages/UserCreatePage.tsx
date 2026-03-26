@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isCurrentUserAdmin, createUserAccount } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function UserCreatePage() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function UserCreatePage() {
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [helpProfiles] = useState<UserProfile[]>(['admin']);
 
   useEffect(() => {
     const init = async () => {
@@ -43,7 +45,7 @@ export default function UserCreatePage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="create-user" helpProfiles={helpProfiles} />
       <h2>Créer un utilisateur</h2>
 
       {pageLoading ? <div className="spinner"></div> : (

@@ -7,6 +7,7 @@ import { getEvent, createEvent, updateEvent, getEventSongs, setEventSongs } from
 import { getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function EventEditPage() {
   const { choirId, eventId } = useParams();
@@ -32,6 +33,8 @@ export default function EventEditPage() {
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
 
   const backUrl = isEditing ? `/event/${eventId}` : `/choir/${resolvedChoirId}`;
+
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -60,6 +63,10 @@ export default function EventEditPage() {
           const userParamId = await getUserParamId(currentUser.email!);
           const isOwner = ownerId === currentUser.id;
           const isCreator = userParamId !== null && data.created_by === userParamId;
+
+          // Construire les profils d'aide
+          if (isOwner) setHelpProfiles(['owner']);
+          else setHelpProfiles(['delegate']);          
       
           if (!isOwner && !isCreator) { navigate('/'); return; }
       
@@ -78,7 +85,11 @@ export default function EventEditPage() {
         const ownerId = await getChoirOwner(choirId!);
         const isOwner = ownerId === currentUser.id;
         const isDelegate = delegations.includes(choirId!);
-      
+
+        // Construire les profils d'aide
+        if (isOwner) setHelpProfiles(['owner']);
+        else setHelpProfiles(['delegate']);
+        
         if (!isOwner && !isDelegate) { navigate('/'); return; }
       
         setResolvedChoirId(choirId!);
@@ -200,7 +211,7 @@ export default function EventEditPage() {
       
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="event-edit" helpProfiles={helpProfiles} />
       <h2>{isEditing ? 'Modifier un événement' : 'Ajouter un événement'}</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

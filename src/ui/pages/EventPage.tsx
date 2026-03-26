@@ -9,6 +9,7 @@ import { getSongFiles, getSongFileUrl } from '../../infrastructure/storage/songs
 import { getCachedFileUrl } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function EventPage() {
   const { eventId } = useParams();
@@ -24,6 +25,8 @@ export default function EventPage() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   // Fonction permettant de générer un fichier pdf global
   const handleGenerateLivret = async () => {
@@ -190,7 +193,10 @@ export default function EventPage() {
 
       // Vrai uniquement si l'événement a été rejoint directement
       // (pas via la chorale) — détermine si le bouton "Quitter" est affiché
-      setIsDirectEventMember(!!storedEvent && !isChoirMember);      
+      setIsDirectEventMember(!!storedEvent && !isChoirMember);   
+      
+      let ownerCheckLocal = false;
+      let creatorCheckLocal = false;
 
       try {
         // Récupérer l'événement depuis Supabase
@@ -205,11 +211,13 @@ export default function EventPage() {
         const ownerId = await getChoirOwner(String(eventData.choir_id));
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
+        ownerCheckLocal = !!(currentUser && ownerId === currentUser.id);
 
         // Vérifier si l'utilisateur est le créateur de l'événement
         const userParamId = currentUser ? await getUserParamId(currentUser.email!) : null;
         const creatorCheck = userParamId !== null && eventData.created_by === userParamId;
         if (creatorCheck) setIsCreator(true);
+        creatorCheckLocal = !!(userParamId !== null && eventData.created_by === userParamId);
 
         // Contrôle d'accès final :
         // - propriétaire → accès total
@@ -261,6 +269,21 @@ export default function EventPage() {
         }
       }
 
+      // Construire les profils d'aide
+      const profiles: UserProfile[] = [];
+      if (!currentUser) {
+        if (isChoirMember) profiles.push('member');
+        else if (storedEvent) profiles.push('guest');
+        else profiles.push('anonymous');
+      } else {
+        if (ownerCheckLocal) profiles.push('owner');
+        else if (creatorCheckLocal) profiles.push('delegate');
+        else if (isChoirMember) profiles.push('member');
+        else if (storedEvent) profiles.push('guest');
+        else profiles.push('anonymous');
+      }
+      setHelpProfiles(profiles);
+
       setLoading(false);
     };
     fetchData();
@@ -279,7 +302,7 @@ export default function EventPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="event" helpProfiles={helpProfiles} />
       
       {loading ? <div className="spinner"></div> : (
         <>

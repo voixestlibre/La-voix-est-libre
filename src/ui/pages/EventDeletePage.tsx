@@ -7,6 +7,7 @@ import { removeStoredEvent, getCachedEvent, clearCachedEventId } from '../../inf
 import { clearEventCache } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function EventDeletePage() {
   const { eventId } = useParams();
@@ -15,6 +16,8 @@ export default function EventDeletePage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -34,6 +37,10 @@ export default function EventDeletePage() {
         // Vérifier que l'utilisateur est propriétaire de la chorale ou créateur de l'évenement
         const ownerId = await getChoirOwner(String(eventData.choir_id));
         const isOwner = ownerId === currentUser.id;
+
+        // Construire les profils d'aide
+        if (isOwner) setHelpProfiles(['owner']);
+        else setHelpProfiles(['delegate']);        
 
         const userParamId = await getUserParamId(currentUser.email!);
         const isCreator = userParamId !== null && eventData.created_by === userParamId;
@@ -75,7 +82,7 @@ export default function EventDeletePage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar helpPage="event-delete" helpProfiles={helpProfiles} />
       <h2>Supprimer un événement</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (

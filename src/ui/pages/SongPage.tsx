@@ -10,6 +10,7 @@ import {
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
 
 export default function SongPage() {
   const { songId } = useParams();
@@ -63,6 +64,8 @@ export default function SongPage() {
   const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set());
   const [fileProgress, setFileProgress] = useState<{ done: number; total: number } | null>(null);
 
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
       setFiles([]);
@@ -78,6 +81,9 @@ export default function SongPage() {
       const currentUser = await getCurrentUser();
       const storedEvents = getStoredEvents();
 
+      let ownerCheckLocal = false;
+      let delegateCheckLocal = false;
+
       try {
         // Récupérer le chant
         const songData = await getSong(songId!);
@@ -90,11 +96,13 @@ export default function SongPage() {
         const ownerId = await getChoirOwner(songData.choir_id);
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
+        ownerCheckLocal = ownerCheck ?? false;
 
         // Vérifier la délégation
         const delegations = currentUser ? await getUserDelegations(currentUser.email!) : [];
         const delegateCheck = delegations.includes(String(songData.choir_id));
         setIsDelegate(delegateCheck);
+        delegateCheckLocal = delegateCheck;
 
         // Contrôle d'accès online
         // - propriétaire → accès total
@@ -177,6 +185,25 @@ export default function SongPage() {
           setFiles([]);
         }
       }
+
+      // Construire les profils d'aide
+      const profiles: UserProfile[] = [];
+      if (!currentUser) {
+        if (storedEvents.some((e) => e.songs?.some((s) => String(s.id) === String(songId)))) {
+          profiles.push('member');
+        } else {
+          profiles.push('anonymous');
+        }
+      } else {
+        if (ownerCheckLocal) profiles.push('owner');
+        else if (delegateCheckLocal) profiles.push('delegate');
+        else if (storedEvents.some((e) => e.songs?.some((s) => String(s.id) === String(songId)))) {
+          profiles.push('member');
+        } else {
+          profiles.push('anonymous');
+        }
+      }
+      setHelpProfiles(profiles);
 
       setLoading(false);
     };
@@ -474,7 +501,7 @@ export default function SongPage() {
       // Empêcher la sélection de texte pendant le swipe
       style={{ userSelect: 'none', touchAction: 'pan-y' }}
     >
-      <TopBar />
+      <TopBar helpPage="song" helpProfiles={helpProfiles} />
 
       {loading ? <div className="spinner"></div> : (
         <>
