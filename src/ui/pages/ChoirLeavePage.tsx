@@ -22,11 +22,12 @@ export default function LeaveChoirPage() {
       const found = stored.find((c) => String(c.id) === String(id));
       if (!found) { navigate('/my-choirs'); return; }
 
+      const currentUser = await getCurrentUser();
+
       try {
         const data = await getChoir(id!);
         setChoirName(data.name);
-        // Rediriger le propriétaire vers la page de la chorale
-        const currentUser = await getCurrentUser();
+        // Rediriger le propriétaire vers la page de la chorale        
         if (currentUser && data.owner_id === currentUser.id) {
           navigate(`/choir/${id}`, { replace: true });
           return;
@@ -37,8 +38,7 @@ export default function LeaveChoirPage() {
       }
       
       // Construire les profils d'aide
-      try {
-        const currentUser = await getCurrentUser();
+      try {        
         if (currentUser) {
           const delegations = await getUserDelegations(currentUser.email!);
           if (delegations.includes(String(id))) {

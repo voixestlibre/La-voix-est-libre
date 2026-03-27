@@ -226,8 +226,18 @@ export default function SongPage() {
     }
   }, [audioUrl]);
 
+  // Déclencher une vibration
+  const vibrateIfMobile = () => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(50); // vibration courte (50 ms)
+    }
+  };  
+  
   // Naviguer vers un autre chant de la liste en conservant le state
   const navigateToSong = (targetId: string) => {
+    // Vibration (mobile uniquement)
+    vibrateIfMobile();
+
     // Arrêter et fermer le lecteur audio avant de naviguer
     if (audioRef.current) {
       audioRef.current.pause();
