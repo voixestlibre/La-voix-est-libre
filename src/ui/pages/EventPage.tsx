@@ -165,7 +165,7 @@ export default function EventPage() {
       setIsGeneratingPdf(false);
       setPdfProgress(null);
     }
-  };
+  }; 
 
   // Fonction permettant de partager l'évènement
   const handleShare = async () => {
