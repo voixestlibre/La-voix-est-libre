@@ -35,6 +35,27 @@ export default function MyChoirsPage() {
       // Extraire uniquement les codes pour les requêtes Supabase
       const joinedCodes = joined.map((c) => c.code);
 
+      // Redirection si aucune chorale, aucun événement, et pas le droit de créer
+      const hasStoredChoirs = joined.length > 0;
+      const hasStoredEvents = getStoredEvents().length > 0;
+      if (!hasStoredChoirs && !hasStoredEvents) {
+        if (!currentUser) {
+          // Non connecté sans données → redirection
+          navigate('/', { replace: true });
+          return;
+        }
+        // Connecté : vérifier le quota
+        try {
+          const param = await getUserParam(currentUser.email!);
+          if (!param || param.choirs_nb === 0) {
+            navigate('/', { replace: true });
+            return;
+          }
+        } catch {
+          // Offline : on laisse passer — on ne peut pas vérifier le quota
+        }
+      }
+
       // Redirection si l'utilisateur n'a que des événements (pas de chorales explicites), en supprimant cette page de l'historique
       if (joined.length === 0 && getStoredEvents().length > 0 && !currentUser) {
         navigate('/my-events', { replace: true });

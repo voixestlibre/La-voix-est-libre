@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getChoirByCode } from '../../infrastructure/storage/choirsService';
 import { getEventByCode, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
@@ -8,12 +8,30 @@ import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
 
 export default function ChoirJoinPage() {
+  const { code } = useParams();
   const [groups, setGroups] = useState<string[]>(['', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
+
+  // Récupérer le code de l'URL s'il existe
+  useEffect(() => {
+    if (!code) return;
+    const cleaned = code.replace(/\D/g, ''); // enlève tout sauf chiffres
+    if (cleaned.length !== 8) return;
+    // Remplir les champs (format 12-34-56-78)
+    const newGroups = [
+      cleaned.slice(0, 2),
+      cleaned.slice(2, 4),
+      cleaned.slice(4, 6),
+      cleaned.slice(6, 8),
+    ];
+    setGroups(newGroups);
+    // lancer automatiquement le join
+    handleJoinFromCode(cleaned);
+  }, [code]);  
 
   // Gestion de la saisie : chiffres uniquement, passage auto au groupe suivant
   const handleChange = (index: number, value: string) => {
@@ -38,6 +56,11 @@ export default function ChoirJoinPage() {
       setError('Veuillez saisir le code complet...');
       return;
     }
+    handleJoinFromCode(code);
+  };
+
+  // Recherche de la chorale ou de l'événement par son code et redirection
+  const handleJoinFromCode = async (code: string) => {    
     setLoading(true);
     setError('');
 
@@ -116,7 +139,7 @@ export default function ChoirJoinPage() {
     }
   };
 
-  return (
+  return ( 
     <div className="page-container">
       <TopBar helpPage="choir-join" helpProfiles={helpProfiles} />
 
