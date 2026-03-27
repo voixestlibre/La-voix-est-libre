@@ -28,6 +28,8 @@ export default function EventPage() {
 
   const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
+  const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
+
   // Fonction permettant de générer un fichier pdf global
   const handleGenerateLivret = async () => {
     setIsGeneratingPdf(true);
@@ -164,6 +166,28 @@ export default function EventPage() {
       setPdfProgress(null);
     }
   };
+
+  // Fonction permettant de partager l'évènement
+  const handleShare = async () => {
+    if (!event) return;
+    if (!('share' in navigator)) return;
+    const shareUrl = `${window.location.origin}${import.meta.env.BASE_URL}join-choir/${event.code}`;
+    const text = `Rejoignez-nous sur 'La voix est libre' !
+      ${event.name}
+      ${shareUrl}`;
+  
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: event.name,
+          text,
+          url: shareUrl,
+        });
+      } 
+    } catch (err) {
+      console.error('Erreur partage:', err);
+    }
+  };  
 
   useEffect(() => {
     const fetchData = async () => {
@@ -431,6 +455,19 @@ export default function EventPage() {
               )}
             </div>
           )}
+
+          {/* Bouton Partager — visible pour tous */}
+          {canShare && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <button
+                className="page-button pink"
+                onClick={handleShare}
+              >
+                <i className="fa fa-share-nodes"></i> &nbsp;
+                Partager
+              </button>
+            </div>
+          )}          
 
           {/* Boutons modification / suppression (propriétaire ou délégué) */}
           {(isOwner || isCreator) && (

@@ -38,12 +38,20 @@ export default function HomePage() {
       setUser(currentUser);
 
       // Afficher "Mes chorales" si :
-      // - l'utilisateur est connecté (peut avoir des chorales propriétaire)
+      // - l'utilisateur est connecté et peut créer des chorales
       // - OU il a des chorales rejointes dans le localStorage
       // - OU il a des événements rejoints (chorales fantômes)
       const hasStoredChoirs = getStoredChoirs().length > 0;
       const hasStoredEvents = getStoredEvents().length > 0;
-      setHasChoirs(!!currentUser || hasStoredChoirs || hasStoredEvents);
+      let canCreateChoir = false;
+      if (currentUser) {
+        try {
+          const { getUserParam } = await import('../../infrastructure/storage/authService');
+          const param = await getUserParam(currentUser.email!);
+          canCreateChoir = !!(param && param.choirs_nb > 0);
+        } catch {}
+      }
+      setHasChoirs(canCreateChoir || hasStoredChoirs || hasStoredEvents);      
 
       // Charger les chants accessibles pour la recherche
       try {

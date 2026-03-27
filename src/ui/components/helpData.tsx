@@ -2,10 +2,10 @@ import React from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type UserProfile = 'owner' | 'delegate' | 'member' | 'guest' | 'anonymous';
+export type UserProfile = 'owner' | 'delegate' | 'member' | 'guest' | 'anonymous' | 'admin' ;
 
 export const profilePriority: UserProfile[] = 
-  ['owner', 'delegate', 'member', 'guest', 'anonymous'];
+  ['admin', 'owner', 'delegate', 'member', 'guest', 'anonymous'];
 
 export interface HelpSection {
   icon?: string;

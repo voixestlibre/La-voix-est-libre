@@ -54,7 +54,7 @@ export default function App() {
         <Route path="/delete-choir/:id" element={<ChoirDeletePage />} />  
         <Route path="/leave-choir/:id" element={<ChoirLeavePage />} />  
         <Route path="/choir/:id" element={<ChoirPage />} />  
-        <Route path="/join-choir" element={<ChoirJoinPage />} />  
+        <Route path="/join-choir/:code?" element={<ChoirJoinPage />} />
         <Route path="/choir-delegation/:choirId" element={<ChoirDelegationPage />} />
         <Route path="/add-song/:choirId" element={<SongEditPage />} />  
         <Route path="/edit-song/:songId" element={<SongEditPage />} />  
