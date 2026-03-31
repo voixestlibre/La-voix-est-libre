@@ -423,7 +423,7 @@ export const helpContent: Record<string, Partial<Record<UserProfile | 'all', Hel
         content: (<>
           Cliquez sur l'icône <i className="fa fa-trash" style={{ color: '#666666' }} /> pour supprimer un évènement (créé par vous-même ou par tout utilisateur ayant reçu délégation de votre part).
         </>), },
-        { icon: 'fa-download', title: 'Mémoriser pour hors ligne',
+        { icon: 'fa-download', title: 'Mémoriser pour usage hors ligne',
           content: (<>
             <p style={{ marginTop:'0', marginBottom:'0.4rem' }}>Cliquez sur l'icône <i className="fa fa-download" style={{ color: '#666' }} /> pour mémoriser les partitions d'un événement pour une utilisation sans réseau (un seul événement peut être mémorisé à la fois).</p>
             <p style={{ margin:'0' }}>L'icône devient bleue <i className="fa fa-download" style={{ color: '#044C8D' }} /> quand les fichiers sont disponibles hors ligne. Vous pouvez alors supprimer les fichiers mémorisés en cliquant à nouveau sur l'icône.</p>
@@ -439,7 +439,7 @@ export const helpContent: Record<string, Partial<Record<UserProfile | 'all', Hel
         content: (<>
           Cliquez sur l'icône <i className="fa fa-trash" style={{ color: '#666666' }} /> pour supprimer un évènement que vous avez créé.
         </>), },
-        { icon: 'fa-download', title: 'Mémoriser pour hors ligne',
+        { icon: 'fa-download', title: 'Mémoriser pour usage hors ligne',
           content: (<>
             <p style={{ marginTop:'0', marginBottom:'0.4rem' }}>Cliquez sur l'icône <i className="fa fa-download" style={{ color: '#666' }} /> pour mémoriser les partitions d'un événement pour une utilisation sans réseau (un seul événement peut être mémorisé à la fois).</p>
             <p style={{ margin:'0' }}>L'icône devient bleue <i className="fa fa-download" style={{ color: '#044C8D' }} /> quand les fichiers sont disponibles hors ligne. Vous pouvez alors supprimer les fichiers mémorisés en cliquant à nouveau sur l'icône.</p>
@@ -447,7 +447,7 @@ export const helpContent: Record<string, Partial<Record<UserProfile | 'all', Hel
       ], },
 
     member: { sections: [
-        { icon: 'fa-download', title: 'Mémoriser pour hors ligne',
+        { icon: 'fa-download', title: 'Mémoriser pour usage hors ligne',
           content: (<>
             <p style={{ marginTop:'0', marginBottom:'0.4rem' }}>Cliquez sur l'icône <i className="fa fa-download" style={{ color: '#666' }} /> pour mémoriser les partitions d'un événement pour une utilisation sans réseau (un seul événement peut être mémorisé à la fois).</p>
             <p style={{ margin:'0' }}>L'icône devient bleue <i className="fa fa-download" style={{ color: '#044C8D' }} /> quand les fichiers sont disponibles hors ligne. Vous pouvez alors supprimer les fichiers mémorisés en cliquant à nouveau sur l'icône.</p>
@@ -455,7 +455,7 @@ export const helpContent: Record<string, Partial<Record<UserProfile | 'all', Hel
       ], },
 
     guest: { sections: [
-        { icon: 'fa-download', title: 'Mémoriser pour hors ligne',
+        { icon: 'fa-download', title: 'Mémoriser pour usage hors ligne',
           content: (<>
             <p style={{ marginTop:'0', marginBottom:'0.4rem' }}>Cliquez sur l'icône <i className="fa fa-download" style={{ color: '#666' }} /> pour mémoriser les partitions d'un événement pour une utilisation sans réseau (un seul événement peut être mémorisé à la fois).</p>
             <p style={{ margin:'0' }}>L'icône devient bleue <i className="fa fa-download" style={{ color: '#044C8D' }} /> quand les fichiers sont disponibles hors ligne. Vous pouvez alors supprimer les fichiers mémorisés en cliquant à nouveau sur l'icône.</p>
