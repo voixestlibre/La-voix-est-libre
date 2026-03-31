@@ -16,7 +16,9 @@ export default function ChoirJoinPage() {
   const navigate = useNavigate();
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
-  // Récupérer le code de l'URL s'il existe
+  // Si un code est passé dans l'URL (ex: /join-choir/12345678), il est automatiquement
+  // saisi dans les champs et le join est déclenché sans intervention de l'utilisateur.
+  // Cela permet de partager un lien direct pour rejoindre une chorale ou un événement.
   useEffect(() => {
     if (!code) return;
     const cleaned = code.replace(/\D/g, ''); // enlève tout sauf chiffres
@@ -60,6 +62,10 @@ export default function ChoirJoinPage() {
   };
 
   // Recherche de la chorale ou de l'événement par son code et redirection
+  // Le code peut désigner une chorale OU un événement — on teste les deux séquentiellement.
+  // Priorité : chorale d'abord, événement ensuite.
+  // Si le code correspond à une chorale, tous ses événements sont immédiatement stockés en localStorage.
+  // Si le code correspond à un événement, seul cet événement est stocké.
   const handleJoinFromCode = async (code: string) => {    
     setLoading(true);
     setError('');

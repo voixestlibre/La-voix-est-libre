@@ -161,7 +161,10 @@
       } catch {}
     };    
 
-    // Clic sur l'icône download → afficher la bannière de confirmation
+    // Le téléchargement offline suit un flux en 3 étapes :
+    // 1. handleOfflineClick : collecte les infos (nombre de fichiers, taille) et affiche la bannière
+    // 2. handleConfirm : déclenche le téléchargement effectif et met à jour le localStorage
+    // 3. handleCancel : ferme la bannière sans action    
     const handleOfflineClick = async (eventId: string, eventName: string, songIds: string[]) => {
       setDownloadReport(null);
       const alreadyCached = getCachedEvent();

@@ -1,3 +1,10 @@
+// Ce fichier centralise tout le contenu d'aide de l'application.
+// Il est organisé par page (clé = identifiant de page) puis par profil utilisateur.
+// Les profils disponibles sont : 'admin', 'owner', 'delegate', 'member', 'guest', 'anonymous'
+// Le profil 'all' s'affiche pour tous les utilisateurs (sections communes).
+// profilePriority définit l'ordre de priorité : seul le profil le plus prioritaire
+// parmi ceux de l'utilisateur est utilisé pour afficher les sections spécifiques.
+
 import React from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────

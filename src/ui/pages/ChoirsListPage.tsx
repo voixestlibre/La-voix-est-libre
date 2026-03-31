@@ -158,6 +158,12 @@ export default function MyChoirsPage() {
         }
       }
 
+      // ── Pourquoi synchroniser les événements ici ? ──────────────────────────
+      // MyChoirsPage est la page "hub" de l'application — elle est visitée
+      // à chaque session. C'est ici que le localStorage est mis à jour pour
+      // refléter l'état réel de Supabase : événements supprimés purgés,
+      // nouveaux événements ajoutés, chants mis à jour.
+
       // ── Synchroniser les événements en localStorage ──────────────────
       // Cette étape s'exécute que l'utilisateur soit connecté ou non,
       // tant que Supabase est accessible (pas dans un bloc catch).
@@ -227,6 +233,12 @@ export default function MyChoirsPage() {
         }));
         setStoredEvents(updatedEvents);
         
+        // ── Chorales fantômes ───────────────────────────────────────────────────
+        // Un utilisateur peut avoir rejoint un événement directement (via son code)
+        // sans avoir rejoint la chorale de rattachement. Dans ce cas, la chorale
+        // apparaît en "fantôme" dans la liste : visible pour naviguer vers l'événement,
+        // mais sans code ni icône d'action (impossible de la rejoindre ou de la quitter).
+
         // PARTIE 5 : calculer les chorales fantômes
         // Une chorale fantôme = chorale de rattachement d'un événement direct
         // dont la chorale n'est PAS dans allLoadedChoirs (non rejointe explicitement).

@@ -10,6 +10,11 @@ interface HelpPopoverProps {
 export default function HelpPopover({ helpPage, helpProfiles, onClose }: HelpPopoverProps) {
   const pageHelp = helpContent[helpPage];
 
+  // Quand le popover s'ouvre, le scroll de la page est bloqué pour éviter que
+  // l'utilisateur ne scrolle la page derrière le popover.
+  // La position du scroll est mémorisée avant le blocage et restaurée à la fermeture.
+  // Cette technique (position: fixed + top: -scrollY) est nécessaire sur iOS
+  // où overflow: hidden seul ne suffit pas à bloquer le scroll.
   useEffect(() => {
     const scrollY = window.scrollY;
   
@@ -34,6 +39,10 @@ export default function HelpPopover({ helpPage, helpProfiles, onClose }: HelpPop
   
   if (!pageHelp) return null;
 
+  // Logique d'affichage :
+  // 1. Les sections 'all' sont toujours affichées en premier
+  // 2. Parmi les profils de l'utilisateur, seul le plus prioritaire (selon profilePriority)
+  //    contribue des sections spécifiques — affichées après les sections 'all'
   const allSections = pageHelp['all']?.sections ?? [];
   const activeProfile = profilePriority.find(p => helpProfiles.includes(p));
   const profileSections = activeProfile ? (pageHelp[activeProfile]?.sections ?? []) : [];

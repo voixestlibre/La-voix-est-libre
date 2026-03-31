@@ -13,6 +13,8 @@ export default function RequestResetPage() {
 
   useEffect(() => {
     const getUser = async () => {
+      // getCurrentUser() est appelé uniquement pour forcer le chargement de la session Supabase
+      // avant d'afficher le formulaire — le résultat n'est pas utilisé.
       await getCurrentUser();
       setPageLoading(false);
     };
@@ -23,6 +25,9 @@ export default function RequestResetPage() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    // Le message de confirmation est intentionnellement vague ("Si cet email est connu...")
+    // pour éviter de révéler si un email est enregistré dans la base ou non.
+    // C'est une bonne pratique de sécurité pour les formulaires de réinitialisation de mot de passe.
     try {
       await requestPasswordReset(email);
       setMessage('Si cet email est connu, vous allez recevoir un email avec un lien pour réinitialiser votre mot de passe.');

@@ -16,6 +16,11 @@ export default function ResetPasswordPage() {
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
   useEffect(() => {
+    // Cette page est accessible depuis un lien email envoyé par Supabase.
+    // Le lien contient un access_token et un refresh_token dans le hash de l'URL (#).
+    // Ces tokens sont extraits et utilisés pour établir une session temporaire
+    // qui permet uniquement de réinitialiser le mot de passe.
+    // Si les tokens sont absents ou invalides, un message d'erreur est affiché.
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.substring(1));
     const accessToken = params.get('access_token');

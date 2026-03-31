@@ -1,3 +1,7 @@
+// Ce composant gère deux cas distincts selon la présence de songId dans l'URL :
+// - /add-song/:choirId  → création d'un nouveau chant (isEditing = false)
+// - /edit-song/:songId  → modification d'un chant existant (isEditing = true)
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
@@ -97,6 +101,8 @@ export default function SongEditPage() {
   };
 
   // Ajouter un hashtag (depuis la saisie libre ou depuis une suggestion)
+  // Les hashtags sont normalisés : accents supprimés, première lettre en majuscule,
+  // préfixe # ajouté automatiquement. Ex: "noël" → "#Noel"
   const addHashtag = (value: string) => {
     const clean = value.trim().replace(/^#+/, '');
     if (!clean) return;

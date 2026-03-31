@@ -24,6 +24,15 @@ export default function DeleteSongPage() {
       // Récupérer le chant
       try {
         const data = await getSong(songId!);
+
+        // Vérification que l'utilisateur a le droit d'effacer
+        const { getChoirOwner } = await import('../../infrastructure/storage/choirsService');
+        const ownerId = await getChoirOwner(data.choir_id);
+        if (ownerId !== currentUser.id) {
+          navigate(`/choir/${data.choir_id}`, { replace: true });
+          return;
+        }
+
         setSongTitle(data.title);
         setChoirId(data.choir_id);
         setPageLoading(false);

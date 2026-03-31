@@ -57,6 +57,9 @@ export default function ImportSongPage() {
   };
 
   // Importer un seul répertoire et retourner le rapport
+  // La nomenclature des répertoires suit la convention :
+  // "Titre du chant - Code-XXXXXX" → le code est extrait automatiquement
+  // Si le répertoire s'appelle simplement "Titre", aucun code n'est associé
   const importDirectory = async (dirEntry: FileSystemDirectoryEntry): Promise<ImportReport> => {
     const rawName = dirEntry.name;
     const report: ImportReport = {
@@ -100,6 +103,9 @@ export default function ImportSongPage() {
     const reader = dirEntry.createReader();
     const entries = await readEntries(reader);
   
+    // Les noms de fichiers sont normalisés avant upload : accents supprimés,
+    // ligatures (œ, æ) remplacées, virgules et points-virgules supprimés
+    // pour éviter des problèmes d'URL dans le bucket Supabase
     for (const fileEntry of entries) {
       if (!fileEntry.isFile) continue;
       const file = await readFile(fileEntry as FileSystemFileEntry);
@@ -170,6 +176,9 @@ export default function ImportSongPage() {
     const ownerId = await getChoirOwner(choirId!);
     if (ownerId !== currentUser.id) { navigate('/'); return; }
 
+    // La vérification des droits est doublée (useEffect + handleDrop) pour
+    // garantir la sécurité même si quelqu'un accède à la page et glisse
+    // des fichiers avant que le useEffect ait terminé
     setImporting(true);
 
     // Importer chaque répertoire et collecter les rapports

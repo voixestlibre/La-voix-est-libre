@@ -30,6 +30,10 @@ export default function LoginPage() {
   }, []);
 
   // Validation du formulaire de connexion
+  // La connexion gère deux cas distincts via la fonction login() :
+  // - Utilisateur existant → connexion normale, redirection vers '/'
+  // - Nouvel utilisateur créé via MAGIC_SECRET (compte créé par un admin) →
+  //   redirection vers '/reset-request' pour définir son mot de passe initial  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -54,7 +58,9 @@ export default function LoginPage() {
     }
   };
 
-  // Déconnexion
+  // La déconnexion via signOut() invalide la session Supabase côté client.
+  // Le localStorage (chorales, événements) n'est PAS effacé lors de la déconnexion
+  // pour permettre un accès offline aux données préalablement mémorisées.  
   const handleLogout = async () => {
     await signOut();
     navigate('/');
