@@ -61,6 +61,8 @@ export default function ChoirDelegationPage() {
         return;
       }
   
+      // createDelegateAccount crée le compte si inexistant, puis ajoute la délégation dans users_param.choirs_delegations
+      // Le mot de passe n'est utilisé que si le compte est nouveau — si le compte existe déjà, il est ignoré
       const result = await createDelegateAccount(email, password, choirId!);
       setMessage(result.isNewUser
         ? 'Compte créé avec succès. La délégation a été accordée.'

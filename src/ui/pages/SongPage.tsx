@@ -23,51 +23,101 @@ export default function SongPage() {
   const [isDelegate, setIsDelegate] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Navigation par swipe
+  // ── Navigation par swipe ─────────────────────────────────────────────
+  // songList est transmis dans location.state par la page appelante (ChoirPage, EventPage)
+  // Il contient la liste ordonnée des ids des chants, permettant la navigation swipe
   const songList: string[] | undefined = location.state?.songList;
   const currentIndex = songList ? songList.findIndex((id) => String(id) === String(songId)) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = songList ? currentIndex < songList.length - 1 : false;
 
-  // Swipe : position du pointeur au début du geste
-  const pointerStartX = useRef<number | null>(null);
-  const SWIPE_THRESHOLD = 50;
+  // Titres des chants précédent et suivant — chargés une seule fois quand l'index change
+  const [prevTitle, setPrevTitle] = useState<string>('');
+  const [nextTitle, setNextTitle] = useState<string>('');
 
-  // Ajout d'hashtags
+  // État du swipe en cours
+  const [translateX, setTranslateX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const pointerStartX = useRef<number | null>(null);
+  const pointerStartY = useRef<number | null>(null);
+
+  // Seuil en pixels à partir duquel le swipe déclenche la navigation
+  const SWIPE_THRESHOLD = 80;
+  // Marge gauche en dessous de laquelle on ignore le swipe
+  // (pour éviter la confusion avec le geste "back" natif iOS)
+  const LEFT_EDGE_MARGIN = 25;
+
+  // ── Hashtags ─────────────────────────────────────────────────────────
   const [showHashtagInput, setShowHashtagInput] = useState(false);
   const [quickHashtagInput, setQuickHashtagInput] = useState('');
   const [allHashtags, setAllHashtags] = useState<string[]>([]);
   const [hashtagSuggestions, setHashtagSuggestions] = useState<string[]>([]);
+  // Ref pour détecter le clic sur une suggestion (évite la perte de focus)
   const clickedSuggestionRef = useRef<string | null>(null);
 
-  // Formulaire ajout fichier
+  // ── Formulaire ajout fichier ──────────────────────────────────────────
   const [label, setLabel] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // PDF plein écran
-  const [pdfPages, setPdfPages] = useState<string[]>([]); // URLs des images de chaque page
+  // ── Visionneuse PDF plein écran ───────────────────────────────────────
+  // Les pages PDF sont rasterisées en images JPEG via pdfjs-dist
+  const [pdfPages, setPdfPages] = useState<string[]>([]);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
-  // Lecteur audio
+  // ── Lecteur audio ─────────────────────────────────────────────────────
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Sélecteur audio affiché dans l'overlay PDF
   const [showAudioSelect, setShowAudioSelect] = useState(false);
+  // Vrai si le PDF est ouvert et qu'il y a des fichiers audio disponibles
   const [pdfAudioReady, setPdfAudioReady] = useState(false);
 
-  // Cache fichiers individuels
+  // ── Cache fichiers individuels ────────────────────────────────────────
+  // Si le chant appartient à l'événement mémorisé, l'utilisateur peut
+  // ajouter/supprimer des fichiers individuels du cache offline
   const [cachedEventId, setCachedEventIdState] = useState<string | null>(null);
   const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set());
   const [fileProgress, setFileProgress] = useState<{ done: number; total: number } | null>(null);
 
+  // ── Aide contextuelle ─────────────────────────────────────────────────
   const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
+  // ── Chargement des titres adjacents ──────────────────────────────────
+  // Chargés une seule fois quand l'index change pour l'aperçu swipe
+  useEffect(() => {
+    const loadAdjacentTitles = async () => {
+      if (!songList) return;
+      if (hasPrev) {
+        try {
+          const s = await getSong(songList[currentIndex - 1]);
+          setPrevTitle(s.title);
+        } catch { setPrevTitle(''); }
+      }
+      if (hasNext) {
+        try {
+          const s = await getSong(songList[currentIndex + 1]);
+          setNextTitle(s.title);
+        } catch { setNextTitle(''); }
+      }
+    };
+    loadAdjacentTitles();
+  }, [songList, currentIndex]);
+
+  // Reset translateX à chaque changement de chant
+  useEffect(() => {
+    setTranslateX(0);
+  }, [songId]);
+
+  // ── Chargement principal ──────────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
+      // Reset de tous les states au changement de chant
+      // (important pour la navigation par swipe qui ne recharge pas la page)
       setFiles([]);
       setIsOffline(false);
       setSong(null);
@@ -77,52 +127,54 @@ export default function SongPage() {
       setDownloadedFiles(new Set());
       setLoading(true);
 
-      // Récupérer l'utilisateur connecté
       const currentUser = await getCurrentUser();
       const storedEvents = getStoredEvents();
 
+      // Variables locales pour les profils d'aide — le state React n'est pas
+      // encore mis à jour au moment où on construit les profils
       let ownerCheckLocal = false;
       let delegateCheckLocal = false;
 
       try {
-        // Récupérer le chant
+        // ── Mode online ───────────────────────────────────────────────
         const songData = await getSong(songId!);
         setSong(songData);
 
+        // Charger les hashtags connus de la chorale pour l'autocomplétion
         const known = await getChoirHashtags(songData.choir_id);
         setAllHashtags(known);
 
-        // Vérifier si l'utilisateur connecté est le propriétaire de la chorale
+        // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(songData.choir_id);
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
         ownerCheckLocal = ownerCheck ?? false;
 
-        // Vérifier la délégation
+        // Vérifier si l'utilisateur a reçu délégation sur cette chorale
         const delegations = currentUser ? await getUserDelegations(currentUser.email!) : [];
         const delegateCheck = delegations.includes(String(songData.choir_id));
         setIsDelegate(delegateCheck);
         delegateCheckLocal = delegateCheck;
 
-        // Contrôle d'accès online
-        // - propriétaire → accès total
-        // - delegation → accès partiel
-        // - sinon → accès uniquement si le chant est dans un événement rejoint
+        // Contrôle d'accès :
+        // - propriétaire → accès total (upload, suppression, hashtags)
+        // - délégué → accès partiel (lecture seule des fichiers)
+        // - membre/guest → accès uniquement si le chant est dans un événement rejoint
         const hasEventAccess = storedEvents.some((e) =>
           e.songs?.some((s) => String(s.id) === String(songId))
         );
-
         if (!ownerCheck && !delegateCheck && !hasEventAccess) {
           navigate('/');
           return;
         }
 
         await fetchFiles(songData.title, songData.code ?? undefined);
-        
-        // Incrémenter le compteur de vues
+
+        // Incrémenter le compteur de vues silencieusement
         incrementSongViews(String(songId)).catch(() => {});
 
-        // Vérifier si ce chant appartient à l'événement mémorisé
+        // Vérifier si ce chant appartient à l'événement mémorisé pour le cache offline
+        // → affiche les icônes de téléchargement individuel sur chaque fichier
         const cachedEvent = getCachedEvent();
         if (cachedEvent?.cached_files) {
           const songIsInCachedEvent = cachedEvent.cached_files.some(
@@ -130,7 +182,7 @@ export default function SongPage() {
           );
           if (songIsInCachedEvent) {
             setCachedEventIdState(String(cachedEvent.id));
-            // Construire la liste des fichiers déjà téléchargés
+            // Construire la liste des fichiers déjà présents dans le cache
             const downloaded = new Set<string>();
             for (const f of cachedEvent.cached_files.filter((f) => String(f.songId) === String(songId))) {
               const publicUrl = f.url ?? getSongFileUrl(String(songId), f.fileName);
@@ -141,16 +193,19 @@ export default function SongPage() {
           }
         }
       } catch {
-        // Fallback offline : chercher le chant dans les événements du localStorage
+        // ── Fallback offline ──────────────────────────────────────────
+        // Supabase inaccessible : reconstituer depuis le localStorage et le cache
+
+        // Vérifier que le chant est accessible via un événement en localStorage
         const matchingEvent = storedEvents.find((e) =>
           e.songs?.some((s) => String(s.id) === String(songId))
         );
-
         if (!matchingEvent) {
           navigate('/my-choirs', { replace: true });
           return;
         }
 
+        // Reconstituer le chant depuis le localStorage
         const cachedSong = matchingEvent.songs.find((s) => String(s.id) === String(songId));
         if (cachedSong) {
           setSong({
@@ -161,7 +216,7 @@ export default function SongPage() {
           });
         }
 
-        // Fallback offline : chercher les fichiers dans le cache
+        // Reconstituer les fichiers depuis le cache offline (Cache API)
         const cachedEvent = getCachedEvent();
         if (cachedEvent?.cached_files) {
           const offlineFiles: { name: string }[] = [];
@@ -170,7 +225,7 @@ export default function SongPage() {
             const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
             if (cachedUrl) offlineFiles.push({ name: f.fileName });
           }
-          // Trier comme en online : PDF d'abord, puis audio, alphabétique dans chaque groupe
+          // Trier : PDF d'abord, puis audio, alphabétique dans chaque groupe
           offlineFiles.sort((a, b) => {
             const extA = a.name.split('.').pop()?.toLowerCase() || '';
             const extB = b.name.split('.').pop()?.toLowerCase() || '';
@@ -186,7 +241,7 @@ export default function SongPage() {
         }
       }
 
-      // Construire les profils d'aide
+      // ── Construire les profils d'aide ─────────────────────────────
       const profiles: UserProfile[] = [];
       if (!currentUser) {
         if (storedEvents.some((e) => e.songs?.some((s) => String(s.id) === String(songId)))) {
@@ -207,9 +262,10 @@ export default function SongPage() {
 
       setLoading(false);
     };
+
     fetchData();
 
-    // Arrêter la musique quand on quitte la page
+    // Arrêter la musique quand on quitte la page ou change de chant
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -218,7 +274,7 @@ export default function SongPage() {
     };
   }, [songId, navigate]);
 
-  // Lancer automatiquement la lecture quand l'audio change
+  // Lancer automatiquement la lecture quand l'URL audio change
   useEffect(() => {
     if (audioUrl && audioRef.current) {
       audioRef.current.load();
@@ -226,18 +282,17 @@ export default function SongPage() {
     }
   }, [audioUrl]);
 
-  // Déclencher une vibration
+  // ── Vibration mobile ──────────────────────────────────────────────────
   const vibrateIfMobile = () => {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate(50); // vibration courte (50 ms)
+      navigator.vibrate(50);
     }
-  };  
-  
-  // Naviguer vers un autre chant de la liste en conservant le state
-  const navigateToSong = (targetId: string) => {
-    // Vibration (mobile uniquement)
-    vibrateIfMobile();
+  };
 
+  // ── Navigation entre chants ───────────────────────────────────────────
+  // Arrête l'audio et navigue vers un autre chant en conservant songList dans le state
+  const navigateToSong = (targetId: string) => {
+    vibrateIfMobile();
     // Arrêter et fermer le lecteur audio avant de naviguer
     if (audioRef.current) {
       audioRef.current.pause();
@@ -245,16 +300,75 @@ export default function SongPage() {
     }
     setAudioUrl(null);
     setAudioName('');
-
     navigate(`/song/${targetId}`, {
       state: {
         backUrl: location.state?.backUrl,
         songList, // retransmettre la liste pour les swipes suivants
       },
-      replace: true, // ne pas empiler dans l'historique
+      replace: true, // ne pas empiler dans l'historique pour faciliter le retour
     });
   };
 
+  // ── Gestionnaires de swipe ────────────────────────────────────────────
+  const resetSwipe = () => {
+    pointerStartX.current = null;
+    pointerStartY.current = null;
+    setIsSwiping(false);
+    setTranslateX(0);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Ignorer si PDF ouvert, pas de liste, ou démarrage trop près du bord gauche
+    // (bord gauche réservé au geste "back" natif iOS)
+    if ((pdfPages.length > 0 || pdfLoading) || !songList) return;
+    if (e.clientX < LEFT_EDGE_MARGIN) return;
+    pointerStartX.current = e.clientX;
+    pointerStartY.current = e.clientY;
+    setIsSwiping(false);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerStartX.current === null || pointerStartY.current === null) return;
+    const deltaX = e.clientX - pointerStartX.current;
+    const deltaY = e.clientY - pointerStartY.current;
+    // Si le mouvement est plus vertical qu'horizontal → annuler le swipe
+    // pour ne pas interférer avec le scroll de la page
+    if (!isSwiping && Math.abs(deltaY) > Math.abs(deltaX)) {
+      pointerStartX.current = null;
+      pointerStartY.current = null;
+      return;
+    }
+    setIsSwiping(true);
+    // Capturer le pointer pour recevoir les événements même hors du composant
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setTranslateX(deltaX);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerStartX.current === null || !songList) { resetSwipe(); return; }
+    const delta = e.clientX - pointerStartX.current;
+    resetSwipe();
+    if (Math.abs(delta) > SWIPE_THRESHOLD) {
+      if (delta < 0 && hasNext) {
+        // Swipe gauche → chant suivant : animer vers la gauche puis naviguer
+        setTranslateX(-window.innerWidth);
+        setTimeout(() => navigateToSong(songList[currentIndex + 1]), 200);
+        return;
+      } else if (delta > 0 && hasPrev) {
+        // Swipe droite → chant précédent : animer vers la droite puis naviguer
+        setTranslateX(window.innerWidth);
+        setTimeout(() => navigateToSong(songList[currentIndex - 1]), 200);
+        return;
+      }
+    }
+    // Swipe insuffisant → retour en position initiale avec animation
+    setTranslateX(0);
+  };
+
+  const handlePointerCancel = () => resetSwipe();
+
+  // ── Visionneuse PDF ───────────────────────────────────────────────────
+  // Rasterise chaque page du PDF en image JPEG via pdfjs-dist
   const handleOpenPdf = async (url: string) => {
     setPdfLoading(true);
     setPdfError(null);
@@ -263,13 +377,11 @@ export default function SongPage() {
       const pdfjsLib = await import('pdfjs-dist');
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  
       const pdf = await pdfjsLib.getDocument(url).promise;
       const pages: string[] = [];
-  
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2 }); // scale 2 pour bonne résolution
+        const viewport = page.getViewport({ scale: 2 });
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -278,6 +390,7 @@ export default function SongPage() {
         pages.push(canvas.toDataURL('image/jpeg', 0.85));
       }
       setPdfPages(pages);
+      // Proposer la sélection audio si des fichiers audio sont disponibles
       if (!audioUrl && files.some((f) => isAudio(f.name))) setPdfAudioReady(true);
     } catch (err: any) {
       setPdfError(`Erreur : ${err.message}`);
@@ -285,44 +398,8 @@ export default function SongPage() {
     setPdfLoading(false);
   };
 
-  // Pointer Events pour le swipe (fonctionne aussi en mode mobile DevTools)
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Ignorer si PDF ouvert ou pas de liste de navigation
-    if ((pdfPages.length > 0 || pdfLoading) || !songList) return;
-    pointerStartX.current = e.clientX;
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (pointerStartX.current === null || !songList) return;
-    const delta = e.clientX - pointerStartX.current;
-    pointerStartX.current = null;
-
-    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
-
-    if (delta < 0 && hasNext) {
-      // Swipe gauche → chant suivant
-      navigateToSong(songList[currentIndex + 1]);
-    } else if (delta > 0 && hasPrev) {
-      // Swipe droite → chant précédent
-      navigateToSong(songList[currentIndex - 1]);
-    }
-  };
-
-  const handlePointerCancel = () => {
-    // Annulation du geste (ex: scroll vertical capturé par le navigateur)
-    pointerStartX.current = null;
-  };
-  
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (pointerStartX.current === null) return;
-    const deltaX = Math.abs(e.clientX - pointerStartX.current);
-    // Si mouvement majoritairement horizontal → capturer le pointer pour éviter le scroll
-    if (deltaX > 10) {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
-  };
-  
-  // Lister les fichiers triés : PDF en premier, puis audio, ordre alphabétique dans chaque groupe
+  // ── Fichiers ──────────────────────────────────────────────────────────
+  // Récupère et trie les fichiers : PDF d'abord, puis audio, alphabétique
   const fetchFiles = async (songTitle?: string, songCode?: string) => {
     const data = await getSongFiles(songId!, songTitle, songCode);
     const sorted = [...data].sort((a, b) => {
@@ -338,7 +415,9 @@ export default function SongPage() {
     setFiles(sorted);
   };
 
-  // Ajouter un hashtag directement depuis la page du chant
+  // ── Hashtags ──────────────────────────────────────────────────────────
+  // Ajoute un hashtag au chant depuis le champ de saisie rapide
+  // Normalise : supprime les accents, met la première lettre en majuscule, préfixe #
   const handleQuickAddHashtag = async (value: string) => {
     const clean = value.trim().replace(/^#+/, '');
     if (!clean) return;
@@ -358,6 +437,7 @@ export default function SongPage() {
     setShowHashtagInput(false);
   };
 
+  // ── Upload fichier ────────────────────────────────────────────────────
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!file || !label) {
@@ -373,8 +453,8 @@ export default function SongPage() {
     setUploading(true);
     setMessage('');
     try {
-      // Construire le nom final : label sans accents + extension du fichier original
       const ext = file.name.split('.').pop();
+      // Nettoyer le nom : supprime accents, ligatures, virgules
       const cleanLabel = label
         .replace(/œ/g, 'oe').replace(/Œ/g, 'Oe')
         .replace(/æ/g, 'ae').replace(/Æ/g, 'Ae')
@@ -399,7 +479,7 @@ export default function SongPage() {
     setUploading(false);
   };
 
-  // Supprimer un fichier du bucket (avec confirmation)
+  // ── Suppression fichier ───────────────────────────────────────────────
   const handleDeleteFile = async (fileName: string) => {
     if (!window.confirm(`Êtes-vous sûr de vouloir supprimer "${fileName}" ?`)) return;
     try {
@@ -410,7 +490,8 @@ export default function SongPage() {
     }
   };
 
-  // Ajouter ou supprimer un fichier du cache de l'événement mémorisé
+  // ── Cache fichier individuel ──────────────────────────────────────────
+  // Ajoute ou supprime un fichier du cache offline de l'événement mémorisé
   const handleCacheToggle = async (fileName: string) => {
     if (!cachedEventId || fileProgress) return;
     const cachedEvent = getCachedEvent();
@@ -437,7 +518,7 @@ export default function SongPage() {
       setFileProgress({ done: 1, total: 1 });
       setTimeout(() => setFileProgress(null), 500);
     } else {
-      // Télécharger et ajouter le fichier au cache
+      // Télécharger et mettre en cache
       setFileProgress({ done: 0, total: 1 });
       const response = await fetch(publicUrl);
       const cache = await caches.open(`event-files-${cachedEventId}`);
@@ -456,6 +537,7 @@ export default function SongPage() {
     }
   };
 
+  // ── Utilitaires fichiers ──────────────────────────────────────────────
   // Déterminer l'icône Font Awesome selon l'extension du fichier
   const getIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -478,7 +560,7 @@ export default function SongPage() {
   const isPdf = (fileName: string) =>
     fileName.split('.').pop()?.toLowerCase() === 'pdf';
 
-  // Ouvrir un fichier selon son type
+  // Ouvre un fichier : PDF → visionneuse, audio → lecteur
   const handleFileClick = async (fileName: string) => {
     let url: string;
     if (isOffline) {
@@ -500,250 +582,20 @@ export default function SongPage() {
     }
   };
 
+  // ── Rendu ─────────────────────────────────────────────────────────────
   return (
-    <div
-      className="page-container"
-      // Pointer Events sur le conteneur principal pour capturer le swipe
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      // Empêcher la sélection de texte pendant le swipe
-      style={{ userSelect: 'none', touchAction: 'pan-y' }}
-    >
-      <TopBar helpPage="song" helpProfiles={helpProfiles} />
-
-      {loading ? <div className="spinner"></div> : (
-        <>
-          <h2>
-            <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
-            {song.title}
-
-            {/* Code visible uniquement pour le propriétaire */}
-            {isOwner && song.code && (
-              <span style={{
-                marginLeft: '0.6rem',
-                fontSize: '0.75rem',
-                backgroundColor: '#eee',
-                padding: '0.2rem 0.5rem',
-                borderRadius: '6px',
-                color: '#555'
-              }}>
-                {song.code}
-              </span>
-            )}
-          </h2>
-
-          {/* Navigation swipe : flèches + position X/N */}
-          {songList && songList.length > 1 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              margin: '0.3rem 0 0.8rem 0',
-            }}>
-              {/* Flèche précédent */}
-              <i
-                className="fa fa-chevron-left"
-                onClick={() => hasPrev && navigateToSong(songList[currentIndex - 1])}
-                style={{
-                  fontSize: '1.3rem',
-                  color: hasPrev ? '#044C8D' : '#ddd',
-                  cursor: hasPrev ? 'pointer' : 'default',
-                  padding: '0.3rem 0.6rem',
-                }}
-              />
-              {/* Position dans la liste */}
-              <span style={{ fontSize: '0.85rem', color: '#888' }}>
-                {currentIndex >= 0 ? currentIndex + 1 : '?'} / {songList.length}
-              </span>
-              {/* Flèche suivant */}
-              <i
-                className="fa fa-chevron-right"
-                onClick={() => hasNext && navigateToSong(songList[currentIndex + 1])}
-                style={{
-                  fontSize: '1.3rem',
-                  color: hasNext ? '#044C8D' : '#ddd',
-                  cursor: hasNext ? 'pointer' : 'default',
-                  padding: '0.3rem 0.6rem',
-                }}
-              />
-            </div>
-          )}
-
-          {/* Hashtags du chant + ajout rapide si propriétaire */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0', alignItems: 'center' }}>
-            {song.hashtags?.map((tag: string) => (
-              <span key={tag} className="hashtag-pill">{tag}</span>
-            ))}
-            {/* Bulle rose "Ajouter un hashtag" (propriétaire uniquement) */}
-            {isOwner && !showHashtagInput && (
-              <span onClick={() => setShowHashtagInput(true)} style={{
-                backgroundColor: '#DA486D', color: 'white', borderRadius: '20px',
-                padding: '0.3rem 0.8rem', fontSize: '0.85rem', cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: '0.4rem', lineHeight: 1,
-              }}>
-                <i className="fa fa-plus"></i> Ajouter un hashtag
-              </span>
-            )}
-            {/* Icône note : toggle commun — visible par délégué, modifiable par propriétaire uniquement */}
-            {(isOwner || isDelegate) && (
-              <i className="fa fa-music"
-                onClick={isOwner ? async () => {
-                  try { await toggleCommonSong(song.id, !song.is_common); setSong({ ...song, is_common: !song.is_common }); } catch {}
-                } : undefined}
-                style={{ cursor: isOwner ? 'pointer' : 'default', color: song.is_common ? '#FFB300' : '#ddd', fontSize: '1.4rem', marginLeft: '0.5rem' }}
-              />
-            )}
-            {/* Icône cœur : toggle favori — visible par délégué, modifiable par propriétaire uniquement */}
-            {(isOwner || isDelegate) && (
-              <i className="fa fa-heart"
-                onClick={isOwner ? async () => {
-                  try { await toggleFavoriteSong(song.id, !song.is_favorite); setSong({ ...song, is_favorite: !song.is_favorite }); } catch {}
-                } : undefined}
-                style={{ cursor: isOwner ? 'pointer' : 'default', color: song.is_favorite ? '#DA486D' : '#ddd', fontSize: '1.4rem', marginLeft: '0.5rem' }}
-              />
-            )}
-            {/* Champ de saisie rapide avec suggestions */}
-            {isOwner && showHashtagInput && (
-              <div style={{ position: 'relative' }}>
-                <input type="text" autoFocus placeholder="Hashtag..."
-                  value={quickHashtagInput}
-                  onChange={(e) => {
-                    setQuickHashtagInput(e.target.value);
-                    const search = e.target.value.toLowerCase();
-                    setHashtagSuggestions(search.trim().length === 0 ? [] :
-                      allHashtags.filter((h) => h.toLowerCase().includes(search) && !song.hashtags?.includes(h))
-                    );
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleQuickAddHashtag(quickHashtagInput); setHashtagSuggestions([]); }
-                    if (e.key === 'Escape') { setShowHashtagInput(false); setQuickHashtagInput(''); setHashtagSuggestions([]); }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      if (clickedSuggestionRef.current) { handleQuickAddHashtag(clickedSuggestionRef.current); clickedSuggestionRef.current = null; }
-                      else if (quickHashtagInput.trim().length > 0) { handleQuickAddHashtag(quickHashtagInput); }
-                      else { setShowHashtagInput(false); }
-                      setHashtagSuggestions([]);
-                    }, 150);
-                  }}
-                  style={{ borderRadius: '20px', padding: '0.3rem 0.8rem', border: '2px solid #DA486D', fontSize: '0.85rem', outline: 'none', width: '130px' }}
-                />
-                {/* Suggestions d'autocomplétion */}
-                {hashtagSuggestions.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', overflow: 'hidden', minWidth: '160px', zIndex: 100 }}>
-                    {hashtagSuggestions.map((s) => (
-                      <div key={s} onMouseDown={() => { clickedSuggestionRef.current = s; }}
-                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', cursor: 'pointer', color: '#222', borderBottom: '1px solid #eee' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E6F2FF')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-                      >{s}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Barre de progression cache fichier individuel */}
-          {fileProgress && (
-            <div style={{ marginBottom: '0.8rem' }}>
-              <div style={{ height: '6px', backgroundColor: '#FDE8ED', borderRadius: '4px' }}>
-                <div style={{
-                  height: '100%', borderRadius: '4px', backgroundColor: '#DA486D',
-                  width: fileProgress.total > 0 ? `${Math.round((fileProgress.done / fileProgress.total) * 100)}%` : '0%',
-                  transition: 'width 0.3s',
-                }} />
-              </div>
-            </div>
-          )}
-
-          {/* Liste des fichiers */}
-          {files.length === 0 ? (
-            <p>Aucun fichier pour ce chant.</p>
-          ) : (
-            <ul className="list-music">
-              {files.map((f) => (
-                <div key={f.name} className="card-music">
-                  <i className={`fa ${getIcon(f.name)} note`} onClick={() => handleFileClick(f.name)} style={{ cursor: 'pointer' }} />
-                  <div className="text" onClick={() => handleFileClick(f.name)} style={{ cursor: 'pointer' }}>
-                    <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
-                  </div>
-                  {/* Icônes droite : poubelle (propriétaire) + cache (événement mémorisé) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
-                    {/* Icône cache : affichée uniquement si le chant appartient à l'événement mémorisé
-                        et si le fichier est d'un type téléchargeable */}
-                    {cachedEventId && isCacheable(f.name) && (
-                      <i className="fa fa-download"
-                        onClick={() => handleCacheToggle(f.name)}
-                        style={{
-                          fontSize: '1.1rem',
-                          color: downloadedFiles.has(f.name) ? '#044C8D' : '#ccc',
-                          cursor: fileProgress ? 'default' : 'pointer',
-                          marginLeft: 0,
-                          pointerEvents: fileProgress ? 'none' : 'auto',
-                        }}
-                      />
-                    )}
-                    {isOwner && f.source !== 'external' && (
-                      <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => handleDeleteFile(f.name)} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </ul>
-          )}
-
-          {/* Formulaire ajout fichier (propriétaire uniquement) */}
-          {isOwner && (
-            <>
-              <form onSubmit={handleUpload}>
-                <div style={{ margin: '0.8rem 0' }}>
-                  {/* Input file caché, déclenché par le bouton */}
-                  <input type="file" accept="audio/*,.pdf" ref={fileInputRef}
-                    onChange={(e) => {
-                      const selected = e.target.files?.[0] || null;
-                      setFile(selected);
-                      // Préremplir le label avec le nom du fichier sans extension si label vide
-                      if (selected && !label) setLabel(selected.name.split('.').slice(0, -1).join('.'));
-                    }}
-                    style={{ display: 'none' }}
-                  />
-                  <button type="button" className="page-button2" onClick={() => fileInputRef.current?.click()} style={{ marginTop: '1.5rem' }}>
-                    Choisir un fichier
-                  </button>
-                  {file && <p style={{ marginTop: '0.3rem', fontSize: '0.9rem', color: '#555' }}>{file.name}</p>}
-                </div>
-                <input type="text" placeholder="Nom du fichier" value={label}
-                  onChange={(e) => setLabel(e.target.value)} required className="page-form-input" />
-                <button className="page-button" type="submit" disabled={uploading}>
-                  {uploading ? 'Envoi...' : 'Ajouter'}
-                </button>
-              </form>
-              <div>
-                <button className="page-button pink" onClick={() => navigate(`/edit-song/${song.id}`)} style={{ marginTop: '2.5rem' }}>
-                  <i className="fa fa-music"></i> &nbsp; Modifier le chant
-                </button>
-              </div>
-              <div>
-                <button className="page-button pink" onClick={() => navigate(`/delete-song/${song.id}`)} style={{ marginTop: '1.5rem' }}>
-                  <i className="fa fa-music"></i> &nbsp; Supprimer le chant
-                </button>
-              </div>
-              {message && <p style={{ color: 'red' }}>{message}</p>}
-            </>
-          )}
-        </>
-      )}
-
-      {/* Overlay PDF plein écran — pages rendues en images */}
+    <>
+      {/* ── Overlay PDF plein écran ───────────────────────────────────────
+          Placé EN DEHORS du conteneur swipeable pour que position:fixed
+          fonctionne correctement (un transform crée un nouveau contexte
+          de positionnement et piège les éléments fixed à l'intérieur) */}
       {(pdfPages.length > 0 || pdfLoading) && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: '#0A1F44', zIndex: 1000,
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
-          {/* Barre du haut */}
+          {/* Barre de contrôles PDF */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', gap: '0.5rem', flexShrink: 0 }}>
             <button
               onClick={() => { setPdfPages([]); setPdfAudioReady(false); setAudioUrl(null); setAudioName(''); }}
@@ -779,8 +631,7 @@ export default function SongPage() {
               </>
             )}
           </div>
-
-          {/* Contenu : spinner ou pages */}
+          {/* Pages PDF */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
             {pdfLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -799,9 +650,10 @@ export default function SongPage() {
             )}
           </div>
         </div>
-      )}      
+      )}
 
-      {/* Popup flottant lecteur audio (uniquement si PDF non ouvert) */}
+      {/* ── Lecteur audio flottant ────────────────────────────────────────
+          Placé EN DEHORS du conteneur swipeable — même raison que l'overlay PDF */}
       {audioUrl && pdfPages.length === 0 && !pdfLoading && (
         <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', backgroundColor: '#044C8D', color: 'white', borderRadius: '12px', padding: '0.8rem 1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, minWidth: '280px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -811,6 +663,264 @@ export default function SongPage() {
           <audio ref={audioRef} controls autoPlay loop src={audioUrl} style={{ width: '100%', height: '35px' }} />
         </div>
       )}
-    </div>
+
+      {/* ── Zone de swipe ────────────────────────────────────────────────
+          Wrapper overflow:hidden pour masquer les panneaux adjacents */}
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
+
+        {/* Panneau précédent — glisse depuis la gauche lors d'un swipe droite */}
+        {hasPrev && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+            // Se positionne à gauche du panneau courant, suit son déplacement
+            transform: `translateX(calc(-100% + ${Math.max(translateX, 0)}px))`,
+            // Apparaît progressivement (opacité 0 → 1 sur 120px de déplacement)
+            opacity: Math.min(Math.max(translateX, 0) / 120, 1),
+            pointerEvents: 'none', // pas d'interaction avec l'aperçu
+            backgroundColor: 'white',
+            padding: '1rem',
+            boxSizing: 'border-box',
+          }}>
+            <TopBar helpPage="song" helpProfiles={[]} />
+            <h2 style={{ marginTop: '1rem', marginLeft: '5rem' }}>
+              <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
+              {prevTitle}
+            </h2>
+          </div>
+        )}
+
+        {/* Panneau suivant — glisse depuis la droite lors d'un swipe gauche */}
+        {hasNext && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+            transform: `translateX(calc(100% + ${Math.min(translateX, 0)}px))`,
+            opacity: Math.min(Math.abs(Math.min(translateX, 0)) / 120, 1),
+            pointerEvents: 'none',
+            backgroundColor: 'white',
+            padding: '1rem',
+            boxSizing: 'border-box',
+          }}>
+            <TopBar helpPage="song" helpProfiles={[]} />
+            <h2 style={{ marginTop: '1rem', marginRight: '5rem' }}>
+              <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
+              {nextTitle}
+            </h2>
+          </div>
+        )}
+
+        {/* ── Panneau courant ───────────────────────────────────────────── */}
+        <div
+          className="page-container"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          style={{
+            userSelect: 'none',
+            touchAction: 'pan-y', // laisser le scroll vertical au navigateur
+            transform: `translateX(${translateX}px)`,
+            transition: isSwiping ? 'none' : 'transform 0.25s ease',
+          }}
+        >
+          <TopBar helpPage="song" helpProfiles={helpProfiles} />
+
+          {loading ? <div className="spinner"></div> : (
+            <>
+              <h2>
+                <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
+                {song.title}
+                {/* Code du chant — visible uniquement par le propriétaire */}
+                {isOwner && song.code && (
+                  <span style={{
+                    marginLeft: '0.6rem', fontSize: '0.75rem',
+                    backgroundColor: '#eee', padding: '0.2rem 0.5rem',
+                    borderRadius: '6px', color: '#555',
+                  }}>
+                    {song.code}
+                  </span>
+                )}
+              </h2>
+
+              {/* Flèches de navigation + indicateur de position X/N */}
+              {songList && songList.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0.3rem 0 0.8rem 0' }}>
+                  <i className="fa fa-chevron-left"
+                    onClick={() => hasPrev && navigateToSong(songList[currentIndex - 1])}
+                    style={{ fontSize: '1.3rem', color: hasPrev ? '#044C8D' : '#ddd', cursor: hasPrev ? 'pointer' : 'default', padding: '0.3rem 0.6rem' }}
+                  />
+                  <span style={{ fontSize: '0.85rem', color: '#888' }}>
+                    {currentIndex >= 0 ? currentIndex + 1 : '?'} / {songList.length}
+                  </span>
+                  <i className="fa fa-chevron-right"
+                    onClick={() => hasNext && navigateToSong(songList[currentIndex + 1])}
+                    style={{ fontSize: '1.3rem', color: hasNext ? '#044C8D' : '#ddd', cursor: hasNext ? 'pointer' : 'default', padding: '0.3rem 0.6rem' }}
+                  />
+                </div>
+              )}
+
+              {/* Hashtags + ajout rapide (propriétaire) + indicateurs commun/favori */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.5rem 0', alignItems: 'center' }}>
+                {song.hashtags?.map((tag: string) => (
+                  <span key={tag} className="hashtag-pill">{tag}</span>
+                ))}
+                {isOwner && !showHashtagInput && (
+                  <span onClick={() => setShowHashtagInput(true)} style={{
+                    backgroundColor: '#DA486D', color: 'white', borderRadius: '20px',
+                    padding: '0.3rem 0.8rem', fontSize: '0.85rem', cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem', lineHeight: 1,
+                  }}>
+                    <i className="fa fa-plus"></i> Ajouter un hashtag
+                  </span>
+                )}
+                {/* Icône note : commun — visible par délégué, modifiable par propriétaire */}
+                {(isOwner || isDelegate) && (
+                  <i className="fa fa-music"
+                    onClick={isOwner ? async () => {
+                      try { await toggleCommonSong(song.id, !song.is_common); setSong({ ...song, is_common: !song.is_common }); } catch {}
+                    } : undefined}
+                    style={{ cursor: isOwner ? 'pointer' : 'default', color: song.is_common ? '#FFB300' : '#ddd', fontSize: '1.4rem', marginLeft: '0.5rem' }}
+                  />
+                )}
+                {/* Icône cœur : favori — visible par délégué, modifiable par propriétaire */}
+                {(isOwner || isDelegate) && (
+                  <i className="fa fa-heart"
+                    onClick={isOwner ? async () => {
+                      try { await toggleFavoriteSong(song.id, !song.is_favorite); setSong({ ...song, is_favorite: !song.is_favorite }); } catch {}
+                    } : undefined}
+                    style={{ cursor: isOwner ? 'pointer' : 'default', color: song.is_favorite ? '#DA486D' : '#ddd', fontSize: '1.4rem', marginLeft: '0.5rem' }}
+                  />
+                )}
+                {/* Champ de saisie hashtag avec autocomplétion */}
+                {isOwner && showHashtagInput && (
+                  <div style={{ position: 'relative' }}>
+                    <input type="text" autoFocus placeholder="Hashtag..."
+                      value={quickHashtagInput}
+                      onChange={(e) => {
+                        setQuickHashtagInput(e.target.value);
+                        const search = e.target.value.toLowerCase();
+                        setHashtagSuggestions(search.trim().length === 0 ? [] :
+                          allHashtags.filter((h) => h.toLowerCase().includes(search) && !song.hashtags?.includes(h))
+                        );
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleQuickAddHashtag(quickHashtagInput); setHashtagSuggestions([]); }
+                        if (e.key === 'Escape') { setShowHashtagInput(false); setQuickHashtagInput(''); setHashtagSuggestions([]); }
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          if (clickedSuggestionRef.current) { handleQuickAddHashtag(clickedSuggestionRef.current); clickedSuggestionRef.current = null; }
+                          else if (quickHashtagInput.trim().length > 0) { handleQuickAddHashtag(quickHashtagInput); }
+                          else { setShowHashtagInput(false); }
+                          setHashtagSuggestions([]);
+                        }, 150);
+                      }}
+                      style={{ borderRadius: '20px', padding: '0.3rem 0.8rem', border: '2px solid #DA486D', fontSize: '0.85rem', outline: 'none', width: '130px' }}
+                    />
+                    {hashtagSuggestions.length > 0 && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', overflow: 'hidden', minWidth: '160px', zIndex: 100 }}>
+                        {hashtagSuggestions.map((s) => (
+                          <div key={s} onMouseDown={() => { clickedSuggestionRef.current = s; }}
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', cursor: 'pointer', color: '#222', borderBottom: '1px solid #eee' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E6F2FF')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                          >{s}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Barre de progression cache fichier individuel */}
+              {fileProgress && (
+                <div style={{ marginBottom: '0.8rem' }}>
+                  <div style={{ height: '6px', backgroundColor: '#FDE8ED', borderRadius: '4px' }}>
+                    <div style={{
+                      height: '100%', borderRadius: '4px', backgroundColor: '#DA486D',
+                      width: fileProgress.total > 0 ? `${Math.round((fileProgress.done / fileProgress.total) * 100)}%` : '0%',
+                      transition: 'width 0.3s',
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Liste des fichiers */}
+              {files.length === 0 ? (
+                <p>Aucun fichier pour ce chant.</p>
+              ) : (
+                <ul className="list-music">
+                  {files.map((f) => (
+                    <div key={f.name} className="card-music">
+                      <i className={`fa ${getIcon(f.name)} note`} onClick={() => handleFileClick(f.name)} style={{ cursor: 'pointer' }} />
+                      <div className="text" onClick={() => handleFileClick(f.name)} style={{ cursor: 'pointer' }}>
+                        <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+                        {/* Icône cache individuel — affiché si le chant est dans l'événement mémorisé */}
+                        {cachedEventId && isCacheable(f.name) && (
+                          <i className="fa fa-download"
+                            onClick={() => handleCacheToggle(f.name)}
+                            style={{
+                              fontSize: '1.1rem',
+                              color: downloadedFiles.has(f.name) ? '#044C8D' : '#ccc',
+                              cursor: fileProgress ? 'default' : 'pointer',
+                              marginLeft: 0,
+                              pointerEvents: fileProgress ? 'none' : 'auto',
+                            }}
+                          />
+                        )}
+                        {/* Icône suppression — propriétaire uniquement, pas pour les fichiers externes */}
+                        {isOwner && f.source !== 'external' && (
+                          <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => handleDeleteFile(f.name)} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </ul>
+              )}
+
+              {/* Formulaire ajout fichier — propriétaire uniquement */}
+              {isOwner && (
+                <>
+                  <form onSubmit={handleUpload}>
+                    <div style={{ margin: '0.8rem 0' }}>
+                      {/* Input file masqué — déclenché par le bouton */}
+                      <input type="file" accept="audio/*,.pdf" ref={fileInputRef}
+                        onChange={(e) => {
+                          const selected = e.target.files?.[0] || null;
+                          setFile(selected);
+                          if (selected && !label) setLabel(selected.name.split('.').slice(0, -1).join('.'));
+                        }}
+                        style={{ display: 'none' }}
+                      />
+                      <button type="button" className="page-button2" onClick={() => fileInputRef.current?.click()} style={{ marginTop: '1.5rem' }}>
+                        Choisir un fichier
+                      </button>
+                      {file && <p style={{ marginTop: '0.3rem', fontSize: '0.9rem', color: '#555' }}>{file.name}</p>}
+                    </div>
+                    <input type="text" placeholder="Nom du fichier" value={label}
+                      onChange={(e) => setLabel(e.target.value)} required className="page-form-input" />
+                    <button className="page-button" type="submit" disabled={uploading}>
+                      {uploading ? 'Envoi...' : 'Ajouter'}
+                    </button>
+                  </form>
+                  <div>
+                    <button className="page-button pink" onClick={() => navigate(`/edit-song/${song.id}`)} style={{ marginTop: '2.5rem' }}>
+                      <i className="fa fa-music"></i> &nbsp; Modifier le chant
+                    </button>
+                  </div>
+                  <div>
+                    <button className="page-button pink" onClick={() => navigate(`/delete-song/${song.id}`)} style={{ marginTop: '1.5rem' }}>
+                      <i className="fa fa-music"></i> &nbsp; Supprimer le chant
+                    </button>
+                  </div>
+                  {message && <p style={{ color: 'red' }}>{message}</p>}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

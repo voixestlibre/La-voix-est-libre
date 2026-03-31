@@ -51,9 +51,18 @@ export default function HomePage() {
           canCreateChoir = !!(param && param.choirs_nb > 0);
         } catch {}
       }
+      // Condition d'affichage du bouton "Mes chorales" :
+      // - Utilisateur connecté avec quota > 0 (peut créer des chorales)
+      // - OU chorales rejointes dans le localStorage
+      // - OU événements rejoints dans le localStorage (accès via chorale fantôme)      
       setHasChoirs(canCreateChoir || hasStoredChoirs || hasStoredEvents);      
 
       // Charger les chants accessibles pour la recherche
+      // La recherche est construite depuis deux sources :
+      // 1. Chants des chorales propriétaires (tous les chants, via Supabase)
+      // 2. Chants des événements rejoints (uniquement les chants listés dans storedEvents[].songs)
+      // Les chants des événements inactifs sont exclus de la recherche.
+      // La recherche est désactivée en mode offline (le try/catch absorbe l'erreur).      
       try {
         const accessibleSongs: any[] = [];
 

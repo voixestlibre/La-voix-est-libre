@@ -28,6 +28,9 @@ export default function UserCreatePage() {
     init();
   }, [navigate]);
 
+  // createUserAccount crée le compte avec le MAGIC_SECRET comme mot de passe temporaire
+  // (ou directement avec le mot de passe fourni selon l'implémentation de authService).
+  // L'utilisateur devra réinitialiser son mot de passe lors de sa première connexion.
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);

@@ -9,6 +9,11 @@ import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
 
+// Ce composant est utilisé pour DEUX cas distincts selon la présence de eventId dans l'URL :
+// - /add-event/:choirId  → création d'un nouvel événement (isEditing = false)
+// - /edit-event/:eventId → modification d'un événement existant (isEditing = true)
+// Dans le cas de la modification, le choirId est déduit depuis les données de l'événement.
+
 export default function EventEditPage() {
   const { choirId, eventId } = useParams();
   const isEditing = !!eventId;
@@ -121,6 +126,8 @@ export default function EventEditPage() {
   };
 
   // Valider et construire la date depuis les 3 champs jj/mm/aaaa
+  // La date est saisie en 3 champs séparés (JJ / MM / AAAA) pour éviter les problèmes
+  // de format sur mobile (les inputs type="date" ont des comportements variables selon les navigateurs).
   const buildDate = (): string | null => {
     const d = parseInt(day, 10);
     const m = parseInt(month, 10);
@@ -134,6 +141,8 @@ export default function EventEditPage() {
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   };
 
+  // Après création ou modification, les événements du localStorage sont mis à jour
+  // avec les chants sélectionnés pour permettre la navigation offline dans SongPage.
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage('');

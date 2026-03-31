@@ -45,6 +45,9 @@ export default function EventDeletePage() {
         const userParamId = await getUserParamId(currentUser.email!);
         const isCreator = userParamId !== null && eventData.created_by === userParamId;
 
+        // Note : les profils d'aide sont définis AVANT la vérification d'accès finale
+        // car setHelpProfiles ne bloque pas l'exécution — si l'utilisateur est redirigé,
+        // les profils ne seront de toute façon jamais affichés.        
         if (!isOwner && !isCreator) { navigate('/'); return; }
 
         setPageLoading(false);
@@ -56,6 +59,9 @@ export default function EventDeletePage() {
     init();
   }, [eventId, navigate]);
 
+  // Note : deleteEvent ne supprime que l'événement et ses liens event_songs en base.
+  // Les fichiers audio/PDF des chants ne sont PAS supprimés — ils appartiennent aux chants,
+  // pas à l'événement. Seul le cache local de cet événement est supprimé.  
   const handleDelete = async () => {
     setLoading(true);
     try {

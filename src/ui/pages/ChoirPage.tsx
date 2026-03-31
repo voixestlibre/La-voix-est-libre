@@ -67,6 +67,10 @@ export default function ChoirPage() {
       
       let ownerCheckLocal = false;
 
+      // Stratégie d'accès à deux niveaux :
+      // 1. Vérification rapide depuis le localStorage (offline-first) pour déterminer les droits de base
+      // 2. Vérification Supabase pour obtenir les données à jour et confirmer le propriétaire
+      // En cas d'échec Supabase, les données localStorage servent de fallback
       try {
         // Récupérer la chorale depuis Supabase
         const data = await getChoir(id!);
@@ -150,7 +154,8 @@ export default function ChoirPage() {
           );
         setEvents(offlineEvents);
 
-        // Pas de chants accessibles offline (les fichiers ne sont pas en cache)
+        // En mode offline, les chants ne sont pas disponibles car leurs fichiers ne sont pas en cache
+        // (seuls les fichiers d'un événement mis en cache dans MyEventsPage sont accessibles offline)        
         setSongs([]);
       }
 

@@ -20,13 +20,18 @@ export default function LeaveEventPage() {
   useEffect(() => {
     const init = async () => {
       // Vérifier si l'utilisateur est connecté
-      await getCurrentUser();
+      const currentUser = await getCurrentUser();
 
       // Si l'événement n'est plus dans le localStorage → déjà quitté
       const stored = getStoredEvents();
       const found = stored.find((e) => String(e.id) === String(eventId));
       if (!found) { navigate('/my-choirs', { replace: true }); return; }
 
+      // Stratégie de vérification en deux étapes :
+      // 1. Vérification rapide depuis le localStorage (accès offline) : l'événement doit y être présent
+      // 2. Vérification Supabase : s'assurer que l'utilisateur est bien un "guest"
+      //    (a rejoint l'événement directement, et n'est ni membre de la chorale ni propriétaire)
+      // Si Supabase est inaccessible, la vérification offline sur joined_choirs suffit.      
       try {
         // Récupérer l'événement depuis Supabase
         const data = await getEvent(eventId!);
@@ -39,7 +44,6 @@ export default function LeaveEventPage() {
         const isChoirMember = storedChoirs.some((c) => String(c.id) === String(data.choir_id));
 
         // Vérifier si propriétaire
-        const currentUser = await getCurrentUser();
         const ownerId = await getChoirOwner(String(data.choir_id));
         const isOwner = currentUser && ownerId === currentUser.id;
 

@@ -23,7 +23,12 @@ export default function TopBar({ backUrl, helpPage, helpProfiles }: TopBarProps)
   const menuRef = useRef<HTMLDivElement>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Gestion du timer pour ouvrir automatiquement l'aide
+  // Système d'aide automatique : si l'utilisateur reste inactif 7,5 secondes
+  // sur une page ayant une aide configurée (helpPage défini), le popover d'aide
+  // s'ouvre automatiquement — mais une seule fois par page (mémorisé dans localStorage).
+  // Toute interaction (clic, scroll, toucher, mouvement souris) remet le timer à zéro.
+  // Une fois le popover ouvert manuellement ou automatiquement, la page est marquée
+  // comme "vue" dans localStorage['helpSeen'] et ne s'ouvrira plus automatiquement.
   useEffect(() => {
     if (!helpPage || helpOpen) return;
   
@@ -50,7 +55,9 @@ export default function TopBar({ backUrl, helpPage, helpProfiles }: TopBarProps)
     };
   }, [helpPage, helpOpen]);
 
-
+  // hasChoirs détermine la visibilité des éléments de menu "Mes chorales" et "Mes évènements"
+  // Note : la condition !!currentUser est volontairement conservée ici pour le menu TopBar
+  // (différent de HomePage qui vérifie le quota)
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       const currentUser = data.session?.user ?? null;

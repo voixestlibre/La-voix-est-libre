@@ -168,6 +168,9 @@ export default function EventPage() {
   }; 
 
   // Fonction permettant de partager l'évènement
+  // La fonction de partage utilise l'API Web Share (navigator.share) — disponible
+  // principalement sur mobile. Sur desktop, le bouton est masqué (canShare = false).
+  // Le lien partagé pointe vers /join-choir/:code pour permettre un accès direct à l'événement.  
   const handleShare = async () => {
     if (!event) return;
     if (!('share' in navigator)) return;
@@ -262,7 +265,8 @@ export default function EventPage() {
         const songsData = await getEventSongsDetails(eventId!);
         setSongs(songsData);
 
-        // Incrémenter le compteur de vues        
+        // Le compteur de vues est incrémenté de façon silencieuse (.catch) pour ne pas
+        // bloquer l'affichage en cas d'erreur réseau.    
         incrementEventViews(String(eventId)).catch(() => {});
 
       } catch {
