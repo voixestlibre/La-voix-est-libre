@@ -1,4 +1,10 @@
 // infrastructure/translateSupabaseError.ts
+// Ce fichier traduit les messages d'erreur Supabase en français lisible.
+// Le cas 'default' retourne le message original en anglais si aucune traduction
+// n'est disponible — utile pour les erreurs inattendues en développement.
+// Pour ajouter une traduction, copier le message exact retourné par Supabase
+// et ajouter un nouveau case.
+
 export function translateSupabaseError(message: string): string {
     switch (message) {
       case 'Password should be at least 6 characters.':

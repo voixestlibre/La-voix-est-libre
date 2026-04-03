@@ -63,6 +63,10 @@ export function removeStoredEvent(eventId: string): void {
 }
 
 // Retourner l'événement marqué is_cached (au plus 1)
+// Un seul événement peut être marqué is_cached = true à la fois.
+// Cette contrainte est gérée par setCachedEventId() qui démarque tous les autres.
+// getCachedEvent() retourne le premier trouvé — s'il y en avait plusieurs (anomalie),
+// seul le premier serait utilisé.
 export function getCachedEvent(): StoredEvent | null {
   return getStoredEvents().find((e) => e.is_cached === true) ?? null;
 }

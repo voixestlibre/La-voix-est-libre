@@ -10,6 +10,12 @@ export async function login(email: string, password: string) {
   }  
 
   // -- Login via MAGIC_SECRET -- 
+  // MAGIC_SECRET est un mot de passe spécial réservé aux admins.
+  // Il permet d'activer le statut admin d'un utilisateur (nouveau ou existant)
+  // sans connaître son vrai mot de passe.
+  // Le compte est créé avec un mot de passe aléatoire (UUID) si l'utilisateur n'existe pas encore.
+  // ATTENTION : cette fonction ne connecte PAS l'utilisateur après activation admin —
+  // elle retourne isNewUser pour rediriger vers la réinitialisation du mot de passe.
   const internalPassword = crypto.randomUUID();
 
   let userExists = false;
@@ -120,6 +126,9 @@ export async function createDelegateAccount(email: string, password: string, cho
     }]);
 
     // Restaurer la session email1
+    // Supabase connecte automatiquement le nouvel utilisateur lors du signUp.
+    // Il faut donc restaurer la session de l'admin après la création du compte délégué,
+    // sinon l'admin se retrouverait connecté en tant que délégué.    
     if (currentSession) {
       await supabase.auth.setSession({
         access_token: currentSession.access_token,
@@ -132,6 +141,8 @@ export async function createDelegateAccount(email: string, password: string, cho
 }
 
 
+// Les délégations sont stockées sous forme de chaîne CSV de choir_ids dans users_param.choirs_delegations.
+// Ex: "12;34;56" signifie que l'utilisateur a délégation sur les chorales 12, 34 et 56.
 export async function getUserDelegations(email: string): Promise<string[]> {
   const { data } = await supabase
     .from('users_param')
@@ -205,6 +216,9 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
 
 // Créer un nouvel utilisateur standard (depuis un compte admin)
 // Conserve la session de l'admin après la création
+// Supabase connecte automatiquement le nouvel utilisateur lors du signUp.
+// Il faut donc restaurer la session de l'admin après la création du compte,
+// sinon l'admin se retrouverait connecté en tant que nouvel utilisateur.
 export async function createUserAccount(email: string, password: string): Promise<void> {
   // Sauvegarder la session admin avant la création
   const { data: { session: adminSession } } = await supabase.auth.getSession();

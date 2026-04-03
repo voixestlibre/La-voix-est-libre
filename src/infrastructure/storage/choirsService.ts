@@ -2,6 +2,9 @@
 import { supabase } from './supabaseClient';
 
 // Générer un code à 8 chiffres unique dans les tables choirs ET events
+// Le code est vérifié à la fois dans les tables 'choirs' ET 'events' pour garantir
+// l'unicité globale — un même code peut servir à rejoindre une chorale OU un événement
+// depuis la page ChoirJoinPage, donc les deux espaces de nommage sont partagés.
 export async function generateUniqueCode(): Promise<string> {
   let code: string;
   let exists = true;
@@ -105,6 +108,16 @@ export async function countOwnedChoirs(userId: string) {
 
 // Supprimer une chorale et toutes ses données associées :
 // événements, liens event_songs, chants, et fichiers dans le bucket
+// La suppression est faite en plusieurs étapes dans un ordre précis pour respecter
+// les contraintes de clés étrangères :
+// 1. event_songs (références vers events et songs)
+// 2. events (références vers choirs)
+// 3. fichiers bucket (indépendants de la BDD)
+// 4. songs (références vers choirs)
+// 5. choir
+// 6. nettoyage des délégations dans users_param
+// Note : cette fonction n'est pas transactionnelle — en cas d'erreur partielle,
+// des données orphelines peuvent subsister.
 export async function deleteChoirCascade(choirId: string) {
 
   // Étape 1 : récupérer tous les événements de la chorale

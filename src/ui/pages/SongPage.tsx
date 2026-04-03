@@ -89,6 +89,9 @@ export default function SongPage() {
 
   // ── Chargement des titres adjacents ──────────────────────────────────
   // Chargés une seule fois quand l'index change pour l'aperçu swipe
+  // Note : si songList change (navigation vers un autre chant), hasPrev/hasNext
+  // sont recalculés mais les titres ne sont rechargés que si currentIndex change.
+  // Cela évite des appels API inutiles lors des re-renders.
   useEffect(() => {
     const loadAdjacentTitles = async () => {
       if (!songList) return;

@@ -45,6 +45,8 @@ export async function getEventSongs(eventId: string): Promise<string[]> {
 }
 
 // Remplacer les chants associés à un événement
+// La mise à jour est faite en deux étapes (delete + insert) et n'est pas transactionnelle.
+// En cas d'erreur à l'insert, les associations existantes ont déjà été supprimées.
 export async function setEventSongs(eventId: string, songIds: string[]) {
   // Supprimer les associations existantes
   const { error: deleteError } = await supabase
@@ -76,6 +78,10 @@ export async function getChoirEvents(choirId: string) {
 
 
 // Récupérer les chants associés à un événement avec leurs détails
+// Les chants sont récupérés en deux requêtes séparées (event_songs puis songs)
+// car Supabase ne supporte pas facilement les jointures avec tri personnalisé.
+// Le réordonnancement final garantit que l'ordre de position est respecté,
+// même si la deuxième requête ne garantit pas l'ordre des résultats.
 export async function getEventSongsDetails(eventId: string) {
   const { data: links, error: linksError } = await supabase
     .from('event_songs')
@@ -151,6 +157,8 @@ export async function getEventByCode(code: string) {
 }
 
 // Récupérer tous les évènements pour une liste de chorales
+// Cette fonction utilisen .in() qui accepte un tableau vide — une garde
+// if (codes.length === 0) return [] est nécessaire pour éviter une requête invalide.
 export async function getEventsByChoirIds(choirIds: string[]) {
   if (choirIds.length === 0) return [];
   const { data, error } = await supabase
@@ -162,6 +170,8 @@ export async function getEventsByChoirIds(choirIds: string[]) {
 }
 
 
+// Cette fonction utilisen .in() qui accepte un tableau vide — une garde
+// if (codes.length === 0) return [] est nécessaire pour éviter une requête invalide.
 export async function getEventsByCodes(codes: string[]) {
   if (codes.length === 0) return [];
   const { data, error } = await supabase

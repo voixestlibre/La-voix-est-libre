@@ -34,6 +34,12 @@ export async function getSong(songId: string) {
 }
 
 // Lister les fichiers d'un chant, Supabase + externe
+// Les fichiers sont récupérés depuis deux sources :
+// 1. Bucket Supabase (songs-files/{songId}/) → fichiers uploadés manuellement
+// 2. Serveur externe larminat.fr → fichiers générés selon la nomenclature du code
+// Les fichiers externes sont vérifiés via une requête HEAD avant d'être inclus.
+// Un fichier externe avec le même nom qu'un fichier Supabase serait dédupliqué
+// automatiquement (le nom affiché est différent du nom réel).
 export async function getSongFiles(songId: string, songTitle?: string, code?: string) {
   const files: { name: string; url: string; source: 'supabase' | 'external' }[] = [];
 
@@ -101,6 +107,10 @@ export async function deleteSongFile(songId: string, fileName: string) {
 }
 
 // Obtenir l'URL publique d'un fichier
+// Cette fonction reconstruit l'URL externe à partir du nom affiché (lisible)
+// vers le nom réel du fichier sur le serveur externe.
+// Ex: "Mon chant - Alto.mp3" → "XXXXXX-A.mp3"
+// C'est l'inverse de generateExternalFiles() qui construit les noms lisibles.
 export function getSongFileUrl(songId: string, fileName: string, code?: string) {
   // Si aucun code, on reste sur Supabase
   if (!code) {
@@ -126,6 +136,7 @@ export function getSongFileUrl(songId: string, fileName: string, code?: string) 
   // Exemple MP3
   else if (fileName.endsWith(".mp3")) {
     const mp3Map: Record<string, string> = {
+      "Instruments": "2",
       "Alto": "A",
       "Alto 2": "A2",
       "Basse": "B",
@@ -156,6 +167,9 @@ export function getSongFileUrl(songId: string, fileName: string, code?: string) 
 
 
 // Supprimer un chant et tous ses fichiers associés
+// Les fichiers externes ne sont PAS supprimés — ils ne sont pas dans le bucket Supabase.
+// Seuls les fichiers source === 'supabase' sont supprimés du bucket.
+// Les références dans event_songs sont également supprimées pour éviter des liens brisés.
 export async function deleteSong(songId: string) {
   // Lister tous les fichiers du chant dans le bucket
   const files = await getSongFiles(songId);
@@ -297,6 +311,7 @@ function generateExternalFiles(songTitle: string, code: string) {
   
   // Autres MP3s
   const audioMap: Record<string, string> = {
+    '2': 'Instruments',
     'A': 'Alto',
     'A2': 'Alto 2',
     'B': 'Basse',

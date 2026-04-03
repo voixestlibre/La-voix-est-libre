@@ -1,8 +1,16 @@
 // src/infrastructure/storage/cacheService.ts
+// Ce service gère le cache offline des fichiers de partitions via la Cache API du navigateur.
+// Chaque événement mémorisé a son propre cache nommé "event-files-{eventId}".
+// Un seul événement peut être mis en cache à la fois (contrainte applicative, pas technique).
+// Les URLs stockées dans le cache sont les URLs publiques Supabase ou externes —
+// elles servent de clés de recherche dans le cache.
 
 const CACHE_PREFIX = 'event-files-';
 
 // Extensions mémorisables — ajouter 'mp3', 'wav', 'ogg', 'm4a' pour étendre aux audios
+// Seuls les PDF sont mis en cache par défaut.
+// Pour inclure les fichiers audio, ajouter 'mp3', 'wav', 'ogg', 'm4a' à ce tableau.
+// Attention : les fichiers audio peuvent être volumineux (plusieurs Mo par chant).
 const CACHEABLE_EXTENSIONS = ['pdf'];
 
 export function isCacheable(fileName: string): boolean {
@@ -49,6 +57,9 @@ export async function clearEventCache(eventId: string): Promise<void> {
 }
 
 // Obtenir l'URL cachée d'un fichier (null si absent du cache)
+// La fonction crée un Object URL (blob URL) à partir du contenu mis en cache.
+// Ces URLs sont temporaires et valides uniquement pour la session en cours.
+// Elles ne doivent pas être persistées dans le localStorage.
 export async function getCachedFileUrl(
   eventId: string,
   url: string
