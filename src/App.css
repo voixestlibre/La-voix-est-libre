@@ -1,12 +1,14 @@
-/* Styles globaux pour le body */
+/* Reset global + box model cohérent */
 * {
   box-sizing: border-box;
 }
 
+/* Empêche scroll horizontal (important pour swipe) */
 html {
   overflow-x: hidden;
 }
 
+/* Style global du body */
 body {
   overflow-x: hidden;
   margin: 0;
@@ -19,9 +21,9 @@ body {
 /* Conteneur général des pages */
 .page-container {
   width: 100%;
-  max-width: 800px;
+  max-width: 800px; /* Conteneur principal des pages */
   padding: 1rem;
-  margin: 0 auto;
+  margin: 0 auto; /* centrage */
   flex-direction: column;
   align-items: flex-start;
   background-color: white;
@@ -214,7 +216,7 @@ h3 {
 .card-music.green .trash:hover { color: #07829E; }
 
 
-/* Hashtag pill */
+/* Hashtags */
 .hashtag-pill {
   background-color: #044C8D;
   color: white;
@@ -236,7 +238,7 @@ h3 {
   align-items: center;
 }
 
-/* Spinner */
+/* Spinner de chargement */
 .spinner {
   width: 40px;
   height: 40px;
