@@ -402,6 +402,20 @@ export default function SongPage() {
   };
 
   // ── Fichiers ──────────────────────────────────────────────────────────
+
+  // Obtenir le nom d'affichage d'un fichier
+  // Remplace le suffixe " - Instruments" par une icône (gérée dans le rendu)
+  const getDisplayName = (fileName: string): string => {
+    const nameWithoutExt = fileName.split('.').slice(0, -1).join('.');
+    return nameWithoutExt.replace(/ - Instruments$/, '');
+  };
+
+  // Vérifier si un fichier est un fichier Instruments
+  const isInstruments = (fileName: string): boolean => {
+    const nameWithoutExt = fileName.split('.').slice(0, -1).join('.');
+    return nameWithoutExt.endsWith(' - Instruments');
+  };
+  
   // Récupère et trie les fichiers : PDF d'abord, puis audio, alphabétique
   const fetchFiles = async (songTitle?: string, songCode?: string) => {
     const data = await getSongFiles(songId!, songTitle, songCode);
@@ -411,8 +425,8 @@ export default function SongPage() {
       const isAudioA = ['mp3', 'wav', 'ogg', 'm4a'].includes(extA);
       const isAudioB = ['mp3', 'wav', 'ogg', 'm4a'].includes(extB);
       if (isAudioA !== isAudioB) return isAudioA ? 1 : -1;
-      const nameA = a.name.split('.').slice(0, -1).join('.');
-      const nameB = b.name.split('.').slice(0, -1).join('.');
+      const nameA = getDisplayName(a.name);
+      const nameB = getDisplayName(b.name);
       return nameA.localeCompare(nameB);
     });
     setFiles(sorted);
@@ -856,7 +870,12 @@ export default function SongPage() {
                     <div key={f.name} className="card-music">
                       <i className={`fa ${getIcon(f.name)} note`} onClick={() => handleFileClick(f.name)} style={{ cursor: 'pointer' }} />
                       <div className="text" onClick={() => handleFileClick(f.name)} style={{ cursor: 'pointer' }}>
-                        <strong>{f.name.split('.').slice(0, -1).join('.')}</strong>
+                        <strong>
+                          {getDisplayName(f.name)}
+                          {isInstruments(f.name) && (
+                            <i className="fa fa-music" style={{ color: '#DA486D', marginLeft: '0.4rem' }} />
+                          )}
+                        </strong>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
                         {/* Icône cache individuel — affiché si le chant est dans l'événement mémorisé */}
