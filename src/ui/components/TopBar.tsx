@@ -6,6 +6,8 @@ import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/l
 import { isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import HelpPopover from './HelpPopover';
 import { type UserProfile } from './helpData';
+import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
+import { getSongsByChoirIds } from '../../infrastructure/storage/songsService';
 
 interface TopBarProps {
   backUrl?: string;
@@ -25,6 +27,13 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
   const [helpOpen, setHelpOpen] = useState(false);  
   const menuRef = useRef<HTMLDivElement>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Moteur de recherche
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [allSongs, setAllSongs] = useState<any[]>([]);  
+  const searchRef = useRef<HTMLDivElement>(null);
 
   // Système d'aide automatique : si l'utilisateur reste inactif 7,5 secondes
   // sur une page ayant une aide configurée (helpPage défini), le popover d'aide
@@ -72,8 +81,53 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
         const admin = await isCurrentUserAdmin();
         setIsAdmin(admin);
       }
+
+      // Charger les chants pour la recherche
+      try {
+        const accessibleSongs: any[] = [];
+        // 1. Chants des chorales propriétaires (si connecté)
+        if (currentUser) {
+          try {
+            const owned = await getOwnedChoirs(currentUser.id);
+            const ownedIds = owned.map((c: any) => String(c.id));
+            if (ownedIds.length > 0) {
+              const songs = await getSongsByChoirIds(ownedIds);
+              accessibleSongs.push(...songs);
+            }
+          } catch {}
+        }
+        // 2. Chants des événements rejoints (depuis localStorage)
+        getStoredEvents().forEach((e) => {
+          if (e.active === false) return;
+          e.songs?.forEach((s: any) => {
+            if (!accessibleSongs.some((a) => a.id === s.id)) {
+              accessibleSongs.push({ id: s.id, title: s.title, hashtags: [] });
+            }
+          });
+        });
+        setAllSongs(accessibleSongs);
+      } catch {}
     });
   }, []);
+
+  // useEffect pour détecter les clics à l'extérieur du champ de recherche
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchResults([]); // masque seulement les résultats
+      }
+    };
+    if (searchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [searchOpen]);  
+
+  // Normalisation pour la recherche de chants
+  const normalize = (str: string) =>
+    str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 
   // Fermer le menu si clic en dehors
   useEffect(() => {
@@ -187,6 +241,15 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
 
         {/* Droite : aide + connexion */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+          {/* Loupe pour rechercher les chants — masquée en mode offline ou edge */}
+          {!showOfflineBanner && !showTimeoutBanner && (
+            <span className="navigation" style={{ fontSize: '1.4rem' }}
+              onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(''); setSearchResults([]); }}>
+              <i className="fa fa-magnifying-glass"></i>
+            </span>
+          )}
+
           {/* Bouton aide — visible uniquement si helpPage défini */}
           {showHelp && (
             <span className="navigation" style={{ fontSize: '1.4rem' }} 
@@ -208,6 +271,79 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
           </span>
         </div>
       </div>
+
+      {/* Ligne de recherche — visible uniquement si searchOpen */}
+      {searchOpen && (
+        <div ref={searchRef} style={{
+          padding: '0.4rem 0rem 0.4rem 0rem',        
+          position: 'relative',
+        }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '5500px', margin: '0 auto 0.5rem auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Rechercher un chant..."
+              value={searchQuery}
+              onChange={(e) => {
+                const q = e.target.value;
+                setSearchQuery(q);
+                if (q.trim().length === 0) { setSearchResults([]); return; }
+                const qNorm = normalize(q.trim());
+                setSearchResults(
+                  allSongs.filter(s =>
+                    normalize(s.title).includes(qNorm) ||
+                    s.hashtags?.some((h: string) => normalize(h).includes(qNorm))
+                  ).slice(0, 8)
+                );
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length === 0) return;
+                const qNorm = normalize(searchQuery.trim());
+                setSearchResults(
+                  allSongs.filter(s =>
+                    normalize(s.title).includes(qNorm) ||
+                    s.hashtags?.some((h: string) => normalize(h).includes(qNorm))
+                  ).slice(0, 8)
+                );
+              }}
+              className="page-form-input"
+              style={{ flex: 1, margin: 0, width: '100%', maxWidth: 'none', display: 'inline-block', fontSize: '16px', border: '2px solid #044C8D', borderRadius: '8px' }}
+            />
+            <i
+              className="fa fa-xmark navigation"
+              style={{ color: '#044C8D', cursor: 'pointer', fontSize: '1.3rem', flexShrink: 0 }}
+              onClick={() => { setSearchOpen(false); setSearchQuery(''); setSearchResults([]); }}
+            />
+          </div>
+
+          {/* Résultats */}
+          {searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0,
+              backgroundColor: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              zIndex: 200, maxHeight: '60vh', overflowY: 'auto',
+              borderRadius: '0 0 8px 8px',
+            }}>
+              {searchResults.map((s) => (
+                <div key={s.id}
+                  onClick={() => { navigate(`/song/${s.id}`); setSearchOpen(false); setSearchQuery(''); setSearchResults([]); }}
+                  style={{ padding: '0.6rem 1rem', borderBottom: '1px solid #eee', cursor: 'pointer', color: '#222' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E6F2FF')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                >
+                  <strong>{s.title}</strong>
+                  {/* Hashtags sous le titre, comme dans HomePage */}
+                  {s.hashtags?.length > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.2rem' }}>
+                      {s.hashtags.join(' ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Popover aide */}
       {helpOpen && helpPage && helpProfiles && (
