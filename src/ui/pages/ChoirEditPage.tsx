@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
-import { createChoir, countOwnedChoirs } from '../../infrastructure/storage/choirsService';
+import { updateChoir, createChoir, countOwnedChoirs } from '../../infrastructure/storage/choirsService';
 import { getStoredChoirs, setStoredChoirs } from '../../infrastructure/storage/localStorageService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
 
-export default function CreationPage() {
+// Ce composant est utilisé pour DEUX cas distincts selon la présence de choirId dans l'URL :
+// - /create-choir/  → création d'une nouvelle chorale (isEditing = false)
+// - /edit-choir/:choirId → modification d'une chorale existante (isEditing = true)
+
+export default function ChoirEditPage() {
+  const { choirId } = useParams();
+  const isEditing = !!choirId;
   const [choraleName, setChoraleName] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -31,14 +37,26 @@ export default function CreationPage() {
       // Compter les chorales existantes
       const count = await countOwnedChoirs(currentUser.id);
 
-      // Désactiver la création si le quota est atteint
+      // Désactiver la création si le quota est atteint (sauf en modification de chorale)
       if (param && count >= param.choirs_nb) {
         setCanCreate(false);
       }
+      if (isEditing) setCanCreate(true);
+
+      if (isEditing) {
+        const storedChoirs = getStoredChoirs();
+        const choir = storedChoirs.find(c => String(c.id) === String(choirId));
+        if (choir) {
+          setChoraleName(choir.name);
+        } else {
+          // optionnel : fallback backend si pas en local
+          console.warn('Chorale non trouvée en local...');
+        }
+      }      
       setPageLoading(false);
     };
     init();
-  }, [navigate]);
+  }, [navigate, isEditing, choirId]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,16 +64,29 @@ export default function CreationPage() {
     setMessage('');
   
     try {
-      // Créer la chorale en base
-      const choir = await createChoir(choraleName, user.id);
-  
-      // Stocker la chorale dans le localStorage
-      // (id inclus pour permettre la correspondance avec joined_events)
-      const stored = getStoredChoirs();
-      setStoredChoirs([...stored, { id: choir.id, code: String(choir.code), name: choraleName }]);
-  
-      // Rediriger vers la page de la chorale (en supprimant la page de création de l'historique)
-      navigate(`/choir/${choir.id}`, { replace: true });
+      if (isEditing) {
+        // Modifier la chorale en base
+        await updateChoir(choirId!, choraleName); 
+        // Stocker la chorale dans le localStorage
+        const stored = getStoredChoirs();
+        const updated = stored.map(c =>
+          String(c.id) === String(choirId)
+            ? { ...c, name: choraleName }
+            : c
+        );
+        setStoredChoirs(updated);        
+        // Rediriger vers la page de la chorale (en supprimant la page de création de l'historique)
+        navigate(`/choir/${choirId}`, { replace: true });
+      } else {
+        // Créer la chorale en base
+        const choir = await createChoir(choraleName, user.id);  
+        // Stocker la chorale dans le localStorage
+        // (id inclus pour permettre la correspondance avec joined_events)
+        const stored = getStoredChoirs();
+        setStoredChoirs([...stored, { id: choir.id, code: String(choir.code), name: choraleName }]);    
+        // Rediriger vers la page de la chorale (en supprimant la page de création de l'historique)
+        navigate(`/choir/${choir.id}`, { replace: true });
+      }            
     } catch (err: any) {
       setMessage(`Erreur : ${err.message}`);
     }
@@ -66,7 +97,7 @@ export default function CreationPage() {
   return (
     <div className="page-container">
       <TopBar helpPage="choir-creation" helpProfiles={helpProfiles} />
-      <h2>Créer une chorale</h2>
+      <h2>{isEditing ? 'Modifier une chorale' : 'Créer une chorale'}</h2>
 
       {pageLoading || loading ? <div className="spinner"></div> : (
         <>
@@ -80,8 +111,8 @@ export default function CreationPage() {
                 required
                 className="page-form-input"
               />
-              <button className="page-button" type="submit">
-                Créer
+              <button className="page-button" type="submit" disabled={loading}>
+                {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
               </button>
             </form>
           )}

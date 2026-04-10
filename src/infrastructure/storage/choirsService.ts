@@ -200,3 +200,11 @@ export async function deleteChoirCascade(choirId: string) {
     }
   }  
 }
+
+export async function updateChoir(choirId: string, name: string) {
+  const { error } = await supabase
+    .from('choirs')
+    .update({ name })
+    .eq('id', choirId);
+  if (error) throw error;
+}

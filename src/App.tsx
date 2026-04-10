@@ -9,7 +9,7 @@ import logoUrl from './assets/logo.png';
 
 // Logo utilisé pour offline
 import HomePage from './ui/pages/HomePage';
-import ChoirCreationPage from './ui/pages/ChoirCreationPage';
+import ChoirEditPage from './ui/pages/ChoirEditPage';
 import ChoirsListPage from './ui/pages/ChoirsListPage';
 import ChoirDeletePage from './ui/pages/ChoirDeletePage';
 import ChoirLeavePage from './ui/pages/ChoirLeavePage';
@@ -62,7 +62,8 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
 
         {/* ── Gestion des chorales ────────────────────── */}
-        <Route path="/create-choir" element={<ChoirCreationPage />} />  
+        <Route path="/create-choir" element={<ChoirEditPage />} />  
+        <Route path="/edit-choir/:choirId" element={<ChoirEditPage />} /> 
         <Route path="/my-choirs" element={<ChoirsListPage />} />  
         <Route path="/delete-choir/:id" element={<ChoirDeletePage />} />  
         <Route path="/leave-choir/:id" element={<ChoirLeavePage />} />  
