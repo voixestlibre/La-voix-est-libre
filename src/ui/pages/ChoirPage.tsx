@@ -764,6 +764,16 @@ export default function ChoirPage() {
                 <button className="page-button orange" 
                   disabled={showOfflineBanner || showTimeoutBanner} 
                   style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                  onClick={() => navigate(`/edit-choir/${choir.id}`)}
+                >
+                  <i className="fa fa-users"></i> &nbsp; Modifier la chorale
+                </button>
+              </div>
+              <div style={{ marginTop: '0.5rem' }}>
+                {/* Bouton désactivé si offline ou timeOut */}
+                <button className="page-button orange" 
+                  disabled={showOfflineBanner || showTimeoutBanner} 
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
                   onClick={() => navigate(`/delete-choir/${choir.id}`)}
                 >
                   <i className="fa fa-users"></i> &nbsp; Supprimer la chorale
