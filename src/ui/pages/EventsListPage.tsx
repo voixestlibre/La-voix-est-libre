@@ -1,524 +1,576 @@
-  import { useState, useEffect } from 'react';
-  import { useNavigate } from 'react-router-dom';
-  import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
-  import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles, toggleEventActive } from '../../infrastructure/storage/eventsService';
-  import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
-  import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
-  import { cacheEventFiles, clearEventCache } from '../../infrastructure/storage/cacheService';
-  import { getSongFiles } from '../../infrastructure/storage/songsService';
-  import { isCacheable } from '../../infrastructure/storage/cacheService';
-  import '../../App.css';
-  import TopBar from '../components/TopBar';
-  import { type UserProfile } from '../components/helpData';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
+import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles, toggleEventActive } from '../../infrastructure/storage/eventsService';
+import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
+import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
+import { cacheEventFiles, clearEventCache } from '../../infrastructure/storage/cacheService';
+import { getSongFiles } from '../../infrastructure/storage/songsService';
+import { isCacheable } from '../../infrastructure/storage/cacheService';
+import '../../App.css';
+import TopBar from '../components/TopBar';
+import { type UserProfile } from '../components/helpData';
+import { usePageLoader } from '../hooks/usePageLoader';
 
-  type ConfirmBanner = {
-    newEventId: string;
-    newEventName: string;
-    newSongIds: string[];
-    replacingName: string | null; // null = premier enregistrement
-    fileCount: number;
-    totalSizeKb: number;    
-  };
+type ConfirmBanner = {
+  newEventId: string;
+  newEventName: string;
+  newSongIds: string[];
+  replacingName: string | null; // null = premier enregistrement
+  fileCount: number;
+  totalSizeKb: number;    
+};
 
-  export default function MyEventsPage() {
-    const [events, setEvents] = useState<any[]>([]);
-    const [ownedChoirIds, setOwnedChoirIds] = useState<string[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [collecting, setCollecting] = useState(false);
-    const [confirmBanner, setConfirmBanner] = useState<ConfirmBanner | null>(null);
-    const [downloading, setDownloading] = useState(false);
-    const [downloadReport, setDownloadReport] = useState<{ name: string; songTitle: string; ok: boolean }[] | null>(null);
-    const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-    const navigate = useNavigate();
+export default function MyEventsPage() {
+  const [events, setEvents] = useState<any[]>([]);
+  const [ownedChoirIds, setOwnedChoirIds] = useState<string[]>([]);
+  const [collecting, setCollecting] = useState(false);
+  const [confirmBanner, setConfirmBanner] = useState<ConfirmBanner | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadReport, setDownloadReport] = useState<{ name: string; songTitle: string; ok: boolean }[] | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const navigate = useNavigate();
 
-    const [userParamId, setUserParamId] = useState<number | null>(null);
-    const [delegatedChoirIds, setDelegatedChoirIds] = useState<string[]>([]);
-    const [explicitChoirIds, setExplicitChoirIds] = useState<string[]>([]);
+  const [userParamId, setUserParamId] = useState<number | null>(null);
+  const [delegatedChoirIds, setDelegatedChoirIds] = useState<string[]>([]);
+  const [explicitChoirIds, setExplicitChoirIds] = useState<string[]>([]);
 
-    const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
+  const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
-    useEffect(() => {
-      const fetchData = async () => {
-        const currentUser = await getCurrentUser();
-        let localDelegations: string[] = [];
+  // Gestion du spinner et des bandeaux réseau
+  const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
+    setShowOfflineBanner, forceOffline, cancelled } = usePageLoader();
+
+  // Basculement forcé en mode offline (timeout atteint pendant le spinner)
+  useEffect(() => {
+    if (!forceOffline) return;
+    const storedChoirs = getStoredChoirs();
+    setExplicitChoirIds(storedChoirs.map((c) => String(c.id)));        
+    const storedEvents = getStoredEvents();
+    const sortedStoredEvents = [...storedEvents].sort((a, b) => new Date(b.event_date ?? 0).getTime() - new Date(a.event_date ?? 0).getTime());
+    setEvents(sortedStoredEvents);
+    const profiles: UserProfile[] = [];
+    if (storedChoirs.length > 0) profiles.push('member');
+    else if (storedEvents.length > 0) profiles.push('guest');
+    else profiles.push('anonymous');
+    setHelpProfiles(profiles);
+    setLoading(false);
+  }, [forceOffline]);
+
+  useEffect(() => {
+    // Lancer le spinner
+    setLoading(true);
+
+    const fetchData = async () => {
+      const currentUser = await getCurrentUser();
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
+
+      let localDelegations: string[] = [];
+      if (currentUser) {
+        const paramId = await getUserParamId(currentUser.email!);
+        setUserParamId(paramId);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;          
+
+        const delegations = await getUserDelegations(currentUser.email!);
+        localDelegations = delegations;
+        setDelegatedChoirIds(delegations);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;          
+      }
+      const storedChoirs = getStoredChoirs();
+      setExplicitChoirIds(storedChoirs.map((c) => String(c.id)));        
+      const storedEvents = getStoredEvents();
+      const storedCodes = storedEvents.map((e) => String(e.code));
+
+      let ownedIds: string[] = [];
+
+      try {
+        const allValidEvents: any[] = [];          
+
+        // PARTIE 1 : événements des chorales propriétaires (si connecté)
         if (currentUser) {
-          const paramId = await getUserParamId(currentUser.email!);
-          setUserParamId(paramId);
-          const delegations = await getUserDelegations(currentUser.email!);
-          localDelegations = delegations;
-          setDelegatedChoirIds(delegations);
-        }
-        const storedChoirs = getStoredChoirs();
-        setExplicitChoirIds(storedChoirs.map((c) => String(c.id)));        
-        const storedEvents = getStoredEvents();
-        const storedCodes = storedEvents.map((e) => String(e.code));
+          const ownedChoirs = await getOwnedChoirs(currentUser.id);
 
-        let ownedIds: string[] = [];
+          // Si timeout déclenché
+          if (cancelled.current) return;
+                    
+          ownedIds = ownedChoirs.map((c: any) => String(c.id));
+          setOwnedChoirIds(ownedIds);
 
-        try {
-          const allValidEvents: any[] = [];          
+          if (ownedIds.length > 0) {
+            const ownedEvents = await getEventsByChoirIds(ownedIds);
 
-          // PARTIE 1 : événements des chorales propriétaires (si connecté)
-          if (currentUser) {
-            const ownedChoirs = await getOwnedChoirs(currentUser.id);
-            ownedIds = ownedChoirs.map((c: any) => String(c.id));
-            setOwnedChoirIds(ownedIds);
+            // Si timeout déclenché
+            if (cancelled.current) return;
 
-            if (ownedIds.length > 0) {
-              const ownedEvents = await getEventsByChoirIds(ownedIds);
-              ownedEvents.forEach((ev: any) => {
-                if (!allValidEvents.find((e) => String(e.code) === String(ev.code))) {
-                  const choir = ownedChoirs.find((c: any) => String(c.id) === String(ev.choir_id));
-                  allValidEvents.push({ ...ev, choir_name: choir?.name ?? null });
-                }
-              });
-            }
-          }
-
-          // PARTIE 2 : événements rejoints directement via un code
-          const remainingCodes = storedCodes.filter(
-            (code) => !allValidEvents.find((e) => String(e.code) === code)
-          );
-          if (remainingCodes.length > 0) {
-            const directEvents = await getEventsByCodes(remainingCodes);
-            directEvents.forEach((ev: any) => {
+            ownedEvents.forEach((ev: any) => {
               if (!allValidEvents.find((e) => String(e.code) === String(ev.code))) {
-                const stored = storedEvents.find((e) => String(e.code) === String(ev.code));
-                allValidEvents.push({ ...ev, choir_name: stored?.choir_name ?? null });
+                const choir = ownedChoirs.find((c: any) => String(c.id) === String(ev.choir_id));
+                allValidEvents.push({ ...ev, choir_name: choir?.name ?? null });
               }
             });
           }
-
-          // Mettre à jour le localStorage avec les chants à jour pour chaque événement
-          const updatedStoredEvents = await Promise.all(allValidEvents.map(async (ev) => {
-            const existing = storedEvents.find((e) => String(e.code) === String(ev.code));
-            return {
-              id: String(ev.id),
-              code: String(ev.code),
-              name: ev.name,
-              choir_id: ev.choir_id,
-              choir_name: ev.choir_name,
-              // Charger les chants depuis Supabase, fallback sur le localStorage si erreur
-              songs: await getEventSongsTitles(String(ev.id)).catch(() => existing?.songs ?? []),
-              is_cached: existing?.is_cached ?? false,
-              cached_files: existing?.cached_files ?? [],
-              event_date: ev.event_date ?? existing?.event_date ?? null,
-              active: ev.active ?? existing?.active ?? true,
-            };
-          }));
-          setStoredEvents(updatedStoredEvents);
-
-          // Nettoyage : si l'événement mémorisé n'existe plus dans la liste valide → supprimer le cache
-          const cachedEvent = getCachedEvent();
-          if (cachedEvent && !allValidEvents.find((ev) => String(ev.id) === String(cachedEvent.id))) {
-            await clearEventCache(String(cachedEvent.id));
-            clearCachedEventId();
-          }
-
-          // Trier par date décroissante
-          allValidEvents.sort((a, b) =>
-            new Date(b.event_date ?? 0).getTime() - new Date(a.event_date ?? 0).getTime()
-          );
-
-          setEvents(allValidEvents);
-        } catch {
-          const sortedStoredEvents = [...storedEvents].sort(
-            (a, b) =>
-              new Date(b.event_date ?? 0).getTime() -
-              new Date(a.event_date ?? 0).getTime()
-          );
-          setEvents(sortedStoredEvents);
         }
 
-        // Construire les profils d'aide
-        const profiles: UserProfile[] = [];
-        if (!currentUser) {
-          if (getStoredChoirs().length > 0) profiles.push('member');
-          else if (getStoredEvents().length > 0) profiles.push('guest');
-          else profiles.push('anonymous');
-        } else {
-          if (ownedIds.length > 0) profiles.push('owner');
-          else if (localDelegations.length > 0) profiles.push('delegate');
-          else if (getStoredChoirs().length > 0) profiles.push('member');
-          else if (getStoredEvents().length > 0) profiles.push('guest');
-          else profiles.push('anonymous');
-        }
-        setHelpProfiles(profiles);
-
-        setLoading(false);
-      };
-
-      fetchData();
-    }, []);
-
-    const handleToggleEventActive = async (eventId: string, current: boolean) => {
-      try {
-        await toggleEventActive(eventId, !current);
-        // Mettre à jour le state local
-        setEvents((prev) =>
-          prev.map((ev) => String(ev.id) === String(eventId) ? { ...ev, active: !current } : ev)
+        // PARTIE 2 : événements rejoints directement via un code
+        const remainingCodes = storedCodes.filter(
+          (code) => !allValidEvents.find((e) => String(e.code) === code)
         );
-      } catch {}
-    };    
-
-    // Le téléchargement offline suit un flux en 3 étapes :
-    // 1. handleOfflineClick : collecte les infos (nombre de fichiers, taille) et affiche la bannière
-    // 2. handleConfirm : déclenche le téléchargement effectif et met à jour le localStorage
-    // 3. handleCancel : ferme la bannière sans action    
-    const handleOfflineClick = async (eventId: string, eventName: string, songIds: string[]) => {
-      setDownloadReport(null);
-      const alreadyCached = getCachedEvent();
-    
-      // Si cet événement est déjà mémorisé → désactiver (avec confirmation, sans infos fichiers)
-      if (alreadyCached && String(alreadyCached.id) === String(eventId)) {
-        setConfirmBanner({
-          newEventId: eventId,
-          newEventName: eventName,
-          newSongIds: songIds,
-          replacingName: eventName,
-          fileCount: 0,
-          totalSizeKb: 0,
-        });
-        return;
-      }
-
-      // Bloquer le téléchargement si l'événement est inactif
-      const eventData = events.find((ev) => String(ev.id) === String(eventId));
-      if (eventData && eventData.active === false) {
-        setConfirmBanner({
-          newEventId: eventId,
-          newEventName: eventName,
-          newSongIds: [],
-          replacingName: null,
-          fileCount: -1, // valeur sentinelle pour signaler "événement inactif"
-          totalSizeKb: 0,
-        });
-        return;
-      }
-
-      // Collecter les fichiers téléchargeables pour afficher les infos dans la bannière
-      let fileCount = 0;
-      let totalSizeKb = 0;
-      setCollecting(true);
-      try {
-        for (const songId of songIds) {
-          const storedEvent = getStoredEvents().find((e) => String(e.id) === String(eventId));
-          const songData = storedEvent?.songs.find((s) => String(s.id) === String(songId));
-          const files = await getSongFiles(songId, songData?.title, songData?.code ?? undefined);
-          for (const f of files) {
-            if (isCacheable(f.name)) {
-              fileCount++;
-              // Récupérer la taille via une requête HEAD
-              try {
-                const res = await fetch(f.url, { method: 'HEAD' });
-                const size = res.headers.get('content-length');
-                if (size) totalSizeKb += Math.round(parseInt(size) / 1024);
-              } catch {
-                // Taille non disponible → on ignore
-              }
+        if (remainingCodes.length > 0) {
+          const directEvents = await getEventsByCodes(remainingCodes);
+          directEvents.forEach((ev: any) => {
+            if (!allValidEvents.find((e) => String(e.code) === String(ev.code))) {
+              const stored = storedEvents.find((e) => String(e.code) === String(ev.code));
+              allValidEvents.push({ ...ev, choir_name: stored?.choir_name ?? null });
             }
-          }
+          });
         }
+
+        // Mettre à jour le localStorage avec les chants à jour pour chaque événement
+        const updatedStoredEvents = await Promise.all(allValidEvents.map(async (ev) => {
+          const existing = storedEvents.find((e) => String(e.code) === String(ev.code));
+          return {
+            id: String(ev.id),
+            code: String(ev.code),
+            name: ev.name,
+            choir_id: ev.choir_id,
+            choir_name: ev.choir_name,
+            // Charger les chants depuis Supabase, fallback sur le localStorage si erreur
+            songs: await getEventSongsTitles(String(ev.id)).catch(() => existing?.songs ?? []),
+            is_cached: existing?.is_cached ?? false,
+            cached_files: existing?.cached_files ?? [],
+            event_date: ev.event_date ?? existing?.event_date ?? null,
+            active: ev.active ?? existing?.active ?? true,
+          };
+        }));
+        setStoredEvents(updatedStoredEvents);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;          
+
+        // Nettoyage : si l'événement mémorisé n'existe plus dans la liste valide → supprimer le cache
+        const cachedEvent = getCachedEvent();
+        if (cachedEvent && !allValidEvents.find((ev) => String(ev.id) === String(cachedEvent.id))) {
+          await clearEventCache(String(cachedEvent.id));
+          clearCachedEventId();
+        }
+
+        // Trier par date décroissante
+        allValidEvents.sort((a, b) =>
+          new Date(b.event_date ?? 0).getTime() - new Date(a.event_date ?? 0).getTime()
+        );
+
+        setEvents(allValidEvents);
       } catch {
-        // Erreur réseau → on affiche quand même la bannière sans les infos
+        // Déclenchement de la bannière Offline
+        if (!cancelled.current) setShowOfflineBanner(true);
+
+        const sortedStoredEvents = [...storedEvents].sort(
+          (a, b) =>
+            new Date(b.event_date ?? 0).getTime() -
+            new Date(a.event_date ?? 0).getTime()
+        );
+        setEvents(sortedStoredEvents);
       }
-      setCollecting(false);
-    
+
+      // Construire les profils d'aide
+      const profiles: UserProfile[] = [];
+      if (!currentUser) {
+        if (getStoredChoirs().length > 0) profiles.push('member');
+        else if (getStoredEvents().length > 0) profiles.push('guest');
+        else profiles.push('anonymous');
+      } else {
+        if (ownedIds.length > 0) profiles.push('owner');
+        else if (localDelegations.length > 0) profiles.push('delegate');
+        else if (getStoredChoirs().length > 0) profiles.push('member');
+        else if (getStoredEvents().length > 0) profiles.push('guest');
+        else profiles.push('anonymous');
+      }
+      setHelpProfiles(profiles);
+
+      // Si timeout déclenché
+      if (cancelled.current) return;        
+
+      setLoading(false);
+    };
+
+    fetchData();
+  }, []);
+
+  const handleToggleEventActive = async (eventId: string, current: boolean) => {
+    try {
+      await toggleEventActive(eventId, !current);
+      // Mettre à jour le state local
+      setEvents((prev) =>
+        prev.map((ev) => String(ev.id) === String(eventId) ? { ...ev, active: !current } : ev)
+      );
+    } catch {}
+  };    
+
+  // Le téléchargement offline suit un flux en 3 étapes :
+  // 1. handleOfflineClick : collecte les infos (nombre de fichiers, taille) et affiche la bannière
+  // 2. handleConfirm : déclenche le téléchargement effectif et met à jour le localStorage
+  // 3. handleCancel : ferme la bannière sans action    
+  const handleOfflineClick = async (eventId: string, eventName: string, songIds: string[]) => {
+    setDownloadReport(null);
+    const alreadyCached = getCachedEvent();
+  
+    // Si cet événement est déjà mémorisé → désactiver (avec confirmation, sans infos fichiers)
+    if (alreadyCached && String(alreadyCached.id) === String(eventId)) {
       setConfirmBanner({
         newEventId: eventId,
         newEventName: eventName,
         newSongIds: songIds,
-        replacingName: alreadyCached?.name ?? null,
-        fileCount,
-        totalSizeKb,
+        replacingName: eventName,
+        fileCount: 0,
+        totalSizeKb: 0,
       });
-    };
+      return;
+    }
 
-    const handleConfirm = async () => {
-      if (!confirmBanner) return;
-      const { newEventId, newSongIds } = confirmBanner;
-      const alreadyCached = getCachedEvent();
-      const isDeactivating = alreadyCached && String(alreadyCached.id) === String(newEventId);
+    // Bloquer le téléchargement si l'événement est inactif
+    const eventData = events.find((ev) => String(ev.id) === String(eventId));
+    if (eventData && eventData.active === false) {
+      setConfirmBanner({
+        newEventId: eventId,
+        newEventName: eventName,
+        newSongIds: [],
+        replacingName: null,
+        fileCount: -1, // valeur sentinelle pour signaler "événement inactif"
+        totalSizeKb: 0,
+      });
+      return;
+    }
 
-      setConfirmBanner(null);
-
-      if (isDeactivating) {
-        // Désactivation : supprimer le cache et démarquer l'événement
-        await clearEventCache(newEventId);
-        clearCachedEventId();
-        // Rafraîchir l'affichage
-        setEvents((prev) => [...prev]);
-        return;
-      }
-
-      // Supprimer tous les caches de tous les événements, connus ou non
-      // (nettoyage complet pour éviter tout fichier orphelin)
-      const allCacheKeys = await caches.keys();
-      for (const key of allCacheKeys) {
-        if (key.startsWith('event-files-')) {
-          await caches.delete(key);
-        }
-      }
-      clearCachedEventId();
-
-      // Lancer le téléchargement
-      setDownloading(true);
-      setProgress({ done: 0, total: 0 });
-
-      try {
-        // Collecter tous les fichiers PDF de tous les chants de l'événement
-        const allFiles: { name: string; url: string; songId: string; songTitle: string }[] = [];
-        for (const songId of newSongIds) {
-          const storedEvent = getStoredEvents().find((e) => String(e.id) === String(newEventId));
-          const songData = storedEvent?.songs.find((s) => String(s.id) === String(songId));
-          const songTitle = songData?.title ?? songId;
-          const songCode = songData?.code ?? undefined;
-          const files = await getSongFiles(songId, songTitle, songCode);
-          for (const f of files) {
-            if (isCacheable(f.name)) {
-              allFiles.push({ name: f.name, url: f.url, songId, songTitle });
-              // ↑ utiliser f.url directement (contient déjà l'URL externe ou Supabase)
+    // Collecter les fichiers téléchargeables pour afficher les infos dans la bannière
+    let fileCount = 0;
+    let totalSizeKb = 0;
+    setCollecting(true);
+    try {
+      for (const songId of songIds) {
+        const storedEvent = getStoredEvents().find((e) => String(e.id) === String(eventId));
+        const songData = storedEvent?.songs.find((s) => String(s.id) === String(songId));
+        const files = await getSongFiles(songId, songData?.title, songData?.code ?? undefined);
+        for (const f of files) {
+          if (isCacheable(f.name)) {
+            fileCount++;
+            // Récupérer la taille via une requête HEAD
+            try {
+              const res = await fetch(f.url, { method: 'HEAD' });
+              const size = res.headers.get('content-length');
+              if (size) totalSizeKb += Math.round(parseInt(size) / 1024);
+            } catch {
+              // Taille non disponible → on ignore
             }
           }
         }
+      }
+    } catch {
+      // Erreur réseau → on affiche quand même la bannière sans les infos
+    }
+    setCollecting(false);
+  
+    setConfirmBanner({
+      newEventId: eventId,
+      newEventName: eventName,
+      newSongIds: songIds,
+      replacingName: alreadyCached?.name ?? null,
+      fileCount,
+      totalSizeKb,
+    });
+  };
 
-        setProgress({ done: 0, total: allFiles.length });
+  const handleConfirm = async () => {
+    if (!confirmBanner) return;
+    const { newEventId, newSongIds } = confirmBanner;
+    const alreadyCached = getCachedEvent();
+    const isDeactivating = alreadyCached && String(alreadyCached.id) === String(newEventId);
 
-        // Télécharger et mettre en cache tous les fichiers
-        const results = await cacheEventFiles(newEventId, allFiles, (done, total) => {
-          setProgress({ done, total });
-        });
+    setConfirmBanner(null);
 
-        // Construire le rapport
-        setDownloadReport(allFiles.map((f, i) => ({
-          name: f.name,
-          songTitle: f.songTitle,
-          ok: results[i]?.ok ?? false,
-        })));
+    if (isDeactivating) {
+      // Désactivation : supprimer le cache et démarquer l'événement
+      await clearEventCache(newEventId);
+      clearCachedEventId();
+      // Rafraîchir l'affichage
+      setEvents((prev) => [...prev]);
+      return;
+    }
 
-        // Marquer l'événement comme mémorisé dans le localStorage
-        setCachedEventId(newEventId);
+    // Supprimer tous les caches de tous les événements, connus ou non
+    // (nettoyage complet pour éviter tout fichier orphelin)
+    const allCacheKeys = await caches.keys();
+    for (const key of allCacheKeys) {
+      if (key.startsWith('event-files-')) {
+        await caches.delete(key);
+      }
+    }
+    clearCachedEventId();
 
-        // Sauvegarder les noms de fichiers dans le localStorage
-        const stored = getStoredEvents();
-        setStoredEvents(stored.map((e) =>
-          String(e.id) === String(newEventId)
-          ? { ...e, cached_files: allFiles.map((f) => ({ songId: f.songId, fileName: f.name, url: f.url })) }
-            : e
-        ));        
-      } catch {
-        // Échec silencieux — l'icône restera grise
-      } finally {
-        setDownloading(false);  // ← toujours exécuté
-        setProgress(null);
+    // Lancer le téléchargement
+    setDownloading(true);
+    setProgress({ done: 0, total: 0 });
+
+    try {
+      // Collecter tous les fichiers PDF de tous les chants de l'événement
+      const allFiles: { name: string; url: string; songId: string; songTitle: string }[] = [];
+      for (const songId of newSongIds) {
+        const storedEvent = getStoredEvents().find((e) => String(e.id) === String(newEventId));
+        const songData = storedEvent?.songs.find((s) => String(s.id) === String(songId));
+        const songTitle = songData?.title ?? songId;
+        const songCode = songData?.code ?? undefined;
+        const files = await getSongFiles(songId, songTitle, songCode);
+        for (const f of files) {
+          if (isCacheable(f.name)) {
+            allFiles.push({ name: f.name, url: f.url, songId, songTitle });
+            // ↑ utiliser f.url directement (contient déjà l'URL externe ou Supabase)
+          }
+        }
       }
 
-      // Rafraîchir l'affichage pour mettre à jour les icônes
-      setEvents((prev) => [...prev]);
-    };
+      setProgress({ done: 0, total: allFiles.length });
 
-    const handleCancel = () => setConfirmBanner(null);
+      // Télécharger et mettre en cache tous les fichiers
+      const results = await cacheEventFiles(newEventId, allFiles, (done, total) => {
+        setProgress({ done, total });
+      });
 
-    const formatCode = (code: string) => code.match(/.{1,2}/g)?.join('-') ?? code;
+      // Construire le rapport
+      setDownloadReport(allFiles.map((f, i) => ({
+        name: f.name,
+        songTitle: f.songTitle,
+        ok: results[i]?.ok ?? false,
+      })));
 
-    const isDeactivating = (eventId: string) => {
-      const alreadyCached = getCachedEvent();
-      return alreadyCached && String(alreadyCached.id) === String(eventId);
-    };
+      // Marquer l'événement comme mémorisé dans le localStorage
+      setCachedEventId(newEventId);
 
-    return (
-      <div className="page-container">
-        <TopBar helpPage="my-events" helpProfiles={helpProfiles} />
-        <h2>Mes événements</h2>
+      // Sauvegarder les noms de fichiers dans le localStorage
+      const stored = getStoredEvents();
+      setStoredEvents(stored.map((e) =>
+        String(e.id) === String(newEventId)
+        ? { ...e, cached_files: allFiles.map((f) => ({ songId: f.songId, fileName: f.name, url: f.url })) }
+          : e
+      ));        
+    } catch {
+      // Échec silencieux — l'icône restera grise
+    } finally {
+      setDownloading(false);  // ← toujours exécuté
+      setProgress(null);
+    }
 
-        {/* Indicateur de collecte des infos fichiers */}
-        {collecting && (
-          <p style={{ fontSize: '0.85rem', color: '#DA486D', margin: '0 0 0.5rem 0' }}>
-            <i className="fa fa-spinner fa-spin" style={{ marginRight: '0.4rem' }}></i>
-            Analyse des fichiers...
+    // Rafraîchir l'affichage pour mettre à jour les icônes
+    setEvents((prev) => [...prev]);
+  };
+
+  const handleCancel = () => setConfirmBanner(null);
+
+  const formatCode = (code: string) => code.match(/.{1,2}/g)?.join('-') ?? code;
+
+  const isDeactivating = (eventId: string) => {
+    const alreadyCached = getCachedEvent();
+    return alreadyCached && String(alreadyCached.id) === String(eventId);
+  };
+
+  return (
+    <div className="page-container">
+      <TopBar helpPage="my-events" helpProfiles={helpProfiles} 
+        showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
+      <h2>Mes événements</h2>
+
+      {/* Indicateur de collecte des infos fichiers */}
+      {collecting && (
+        <p style={{ fontSize: '0.85rem', color: '#DA486D', margin: '0 0 0.5rem 0' }}>
+          <i className="fa fa-spinner fa-spin" style={{ marginRight: '0.4rem' }}></i>
+          Analyse des fichiers...
+        </p>
+      )}
+
+      {/* Bannière de confirmation inline */}
+      {confirmBanner && (
+        <div style={{
+          backgroundColor: '#FDE8ED', border: '1px solid #DA486D',
+          borderRadius: '8px', padding: '0.8rem 1rem', marginBottom: '1rem',
+        }}>
+          <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem' }}>
+            {isDeactivating(confirmBanner.newEventId)
+              ? <>Souhaitez-vous supprimer les fichiers mémorisés de <strong>{confirmBanner.newEventName}</strong> ?</>
+              : confirmBanner.replacingName
+              ? <>Souhaitez-vous mémoriser les fichiers de <strong>{confirmBanner.newEventName}</strong> (en remplacement de ceux de <strong>{confirmBanner.replacingName}</strong>) pour une utilisation hors ligne ?</>
+              : <>Souhaitez-vous mémoriser les fichiers de <strong>{confirmBanner.newEventName}</strong> pour une utilisation hors ligne ?</>
+            }
           </p>
-        )}
+          {/* Infos fichiers : affichées uniquement pour les actions de mémorisation */}
 
-        {/* Bannière de confirmation inline */}
-        {confirmBanner && (
-          <div style={{
-            backgroundColor: '#FDE8ED', border: '1px solid #DA486D',
-            borderRadius: '8px', padding: '0.8rem 1rem', marginBottom: '1rem',
-          }}>
-            <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem' }}>
-              {isDeactivating(confirmBanner.newEventId)
-                ? <>Souhaitez-vous supprimer les fichiers mémorisés de <strong>{confirmBanner.newEventName}</strong> ?</>
-                : confirmBanner.replacingName
-                ? <>Souhaitez-vous mémoriser les fichiers de <strong>{confirmBanner.newEventName}</strong> (en remplacement de ceux de <strong>{confirmBanner.replacingName}</strong>) pour une utilisation hors ligne ?</>
-                : <>Souhaitez-vous mémoriser les fichiers de <strong>{confirmBanner.newEventName}</strong> pour une utilisation hors ligne ?</>
+          {!isDeactivating(confirmBanner.newEventId) && (
+            <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.85rem', color: '#DA486D' }}>
+              {confirmBanner.fileCount === -1
+                ? 'Cet événement est inactif — le téléchargement n\'est pas disponible.'
+                : confirmBanner.fileCount === 0
+                ? 'Aucun fichier téléchargeable.'
+                : <>
+                    Nombre de fichiers : <strong>{confirmBanner.fileCount}</strong>
+                    {confirmBanner.totalSizeKb > 0 && (
+                      <> &nbsp;·&nbsp; Taille totale : <strong>
+                        {confirmBanner.totalSizeKb >= 1024
+                          ? `${(confirmBanner.totalSizeKb / 1024).toFixed(1)} Mo`
+                          : `${confirmBanner.totalSizeKb} Ko`}
+                      </strong></>
+                    )}
+                  </>
               }
             </p>
-            {/* Infos fichiers : affichées uniquement pour les actions de mémorisation */}
+          )}
 
-            {!isDeactivating(confirmBanner.newEventId) && (
-              <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.85rem', color: '#DA486D' }}>
-                {confirmBanner.fileCount === -1
-                  ? 'Cet événement est inactif — le téléchargement n\'est pas disponible.'
-                  : confirmBanner.fileCount === 0
-                  ? 'Aucun fichier téléchargeable.'
-                  : <>
-                      Nombre de fichiers : <strong>{confirmBanner.fileCount}</strong>
-                      {confirmBanner.totalSizeKb > 0 && (
-                        <> &nbsp;·&nbsp; Taille totale : <strong>
-                          {confirmBanner.totalSizeKb >= 1024
-                            ? `${(confirmBanner.totalSizeKb / 1024).toFixed(1)} Mo`
-                            : `${confirmBanner.totalSizeKb} Ko`}
-                        </strong></>
-                      )}
-                    </>
-                }
-              </p>
-            )}
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {/* Bouton Confirmer masqué si aucun fichier téléchargeable */}
-              {(isDeactivating(confirmBanner.newEventId) || confirmBanner.fileCount > 0) && (
-                <button className="page-button pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleConfirm}>
-                  Confirmer
-                </button>
-              )}
-              <button className="page-button2 pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleCancel}>
-                Annuler
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {/* Bouton Confirmer masqué si aucun fichier téléchargeable */}
+            {(isDeactivating(confirmBanner.newEventId) || confirmBanner.fileCount > 0) && (
+              <button className="page-button pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleConfirm}>
+                Confirmer
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* Barre de progression */}
-        {downloading && progress && (
-          <div style={{ marginBottom: '1rem' }}>
-            <p style={{ fontSize: '0.9rem', color: '#DA486D', margin: '0 0 0.3rem 0' }}>
-              Téléchargement : {progress.done} / {progress.total} fichiers
-            </p>
-            <div style={{ height: '6px', backgroundColor: '#FDE8ED', borderRadius: '4px' }}>
-              <div style={{
-                height: '100%', borderRadius: '4px', backgroundColor: '#DA486D',
-                width: progress.total > 0 ? `${Math.round((progress.done / progress.total) * 100)}%` : '0%',
-                transition: 'width 0.2s',
-              }} />
-            </div>
-          </div>
-        )}
-
-        {/* Rapport de téléchargement */}
-        {downloadReport && (
-          <div style={{ marginBottom: '1rem', backgroundColor: '#F9F9F9', borderRadius: '8px', padding: '0rem 1rem', border: '1px solid #ddd' }}>
-            <p style={{ fontWeight: 'bold', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              Résultat du téléchargement :
-            </p>
-            {downloadReport.map((r, i) => (
-              <div key={i} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
-                <i className={`fa ${r.ok ? 'fa-check' : 'fa-xmark'}`} style={{ color: r.ok ? 'green' : 'red', width: '1rem' }} />
-                <span style={{ color: r.ok ? '#333' : 'red' }}>
-                  <span style={{ color: '#888', marginRight: '0.3rem' }}>{r.songTitle} —</span>
-                  {r.name}
-                </span>
-              </div>
-            ))}
-            <button className="page-button2 pink" style={{ marginBottom: '0.8rem', marginTop: '0.6rem', padding: '0.3rem 0.8rem', fontSize: '0.85rem' }}
-              onClick={() => setDownloadReport(null)}>
-              Fermer
+            )}
+            <button className="page-button2 pink" style={{ padding: '0.3rem 0.8rem', fontSize: '0.9rem' }} onClick={handleCancel}>
+              Annuler
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {loading ? (
-          <div className="spinner"></div>
-        ) : events.length === 0 ? (
-          <p>Vous n'avez aucun événement.</p>
-        ) : (
-          <ul className="list-music">
-            {events.map((e) => {
-              const isCached = getStoredEvents().find(
-                (se) => String(se.id) === String(e.id)
-              )?.is_cached ?? false;
-              const songIds = (getStoredEvents().find(
-                (se) => String(se.id) === String(e.id)
-              )?.songs ?? []).map((s) => s.id);
+      {/* Barre de progression */}
+      {downloading && progress && (
+        <div style={{ marginBottom: '1rem' }}>
+          <p style={{ fontSize: '0.9rem', color: '#DA486D', margin: '0 0 0.3rem 0' }}>
+            Téléchargement : {progress.done} / {progress.total} fichiers
+          </p>
+          <div style={{ height: '6px', backgroundColor: '#FDE8ED', borderRadius: '4px' }}>
+            <div style={{
+              height: '100%', borderRadius: '4px', backgroundColor: '#DA486D',
+              width: progress.total > 0 ? `${Math.round((progress.done / progress.total) * 100)}%` : '0%',
+              transition: 'width 0.2s',
+            }} />
+          </div>
+        </div>
+      )}
 
-              return (
-                <div key={e.id} className="card-music pink">
-                  {/* Icône calendrier : rose si actif, grise si inactif
-                      Cliquable uniquement par propriétaire ou délégué créateur */}
-                  <i
-                    className="fa fa-calendar-days note"
-                    onClick={() => {
+      {/* Rapport de téléchargement */}
+      {downloadReport && (
+        <div style={{ marginBottom: '1rem', backgroundColor: '#F9F9F9', borderRadius: '8px', padding: '0rem 1rem', border: '1px solid #ddd' }}>
+          <p style={{ fontWeight: 'bold', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+            Résultat du téléchargement :
+          </p>
+          {downloadReport.map((r, i) => (
+            <div key={i} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+              <i className={`fa ${r.ok ? 'fa-check' : 'fa-xmark'}`} style={{ color: r.ok ? 'green' : 'red', width: '1rem' }} />
+              <span style={{ color: r.ok ? '#333' : 'red' }}>
+                <span style={{ color: '#888', marginRight: '0.3rem' }}>{r.songTitle} —</span>
+                {r.name}
+              </span>
+            </div>
+          ))}
+          <button className="page-button2 pink" style={{ marginBottom: '0.8rem', marginTop: '0.6rem', padding: '0.3rem 0.8rem', fontSize: '0.85rem' }}
+            onClick={() => setDownloadReport(null)}>
+            Fermer
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="spinner"></div>
+      ) : events.length === 0 ? (
+        <p>Vous n'avez aucun événement.</p>
+      ) : (
+        <ul className="list-music">
+          {events.map((e) => {
+            const isCached = getStoredEvents().find(
+              (se) => String(se.id) === String(e.id)
+            )?.is_cached ?? false;
+            const songIds = (getStoredEvents().find(
+              (se) => String(se.id) === String(e.id)
+            )?.songs ?? []).map((s) => s.id);
+
+            return (
+              <div key={e.id} className="card-music pink">
+                {/* Icône calendrier : rose si actif, grise si inactif
+                    Cliquable uniquement par propriétaire ou délégué créateur */}
+                <i
+                  className="fa fa-calendar-days note"
+                  onClick={() => {
+                    const isOwner = ownedChoirIds.includes(String(e.choir_id));
+                    const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
+                    const isCreator = userParamId !== null && e.created_by === userParamId;
+                    const canToggle = isOwner || (isDelegate && isCreator);
+                    if (canToggle) handleToggleEventActive(String(e.id), e.active ?? true);
+                  }}
+                  style={{
+                    color: (e.active ?? true) ? '#DA486D' : '#ccc',
+                    cursor: (() => {
                       const isOwner = ownedChoirIds.includes(String(e.choir_id));
                       const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
                       const isCreator = userParamId !== null && e.created_by === userParamId;
-                      const canToggle = isOwner || (isDelegate && isCreator);
-                      if (canToggle) handleToggleEventActive(String(e.id), e.active ?? true);
-                    }}
-                    style={{
-                      color: (e.active ?? true) ? '#DA486D' : '#ccc',
-                      cursor: (() => {
-                        const isOwner = ownedChoirIds.includes(String(e.choir_id));
-                        const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
-                        const isCreator = userParamId !== null && e.created_by === userParamId;
-                        return (isOwner || (isDelegate && isCreator)) ? 'pointer' : 'default';
-                      })(),
-                    }}
-                  />
-                  
-                  <div
-                    className="text"
-                    onClick={() => navigate(`/event/${e.id}`)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <strong style={{ color: (e.active ?? true) ? undefined : '#aaa' }}>{e.name}</strong>
-                    <div style={{ paddingLeft: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', marginTop: '0.2rem' }}>
-                      {e.choir_name && (
-                        <span
-                          onClick={(ev) => { ev.stopPropagation(); navigate(`/choir/${e.choir_id}`); }}
-                          style={{ fontSize: '0.85rem', color: (e.active ?? true) ? '#FB8917' : '#aaa', cursor: 'pointer' }}
-                        >
-                          <i className="fa fa-users" style={{ marginRight: '0.4rem' }}></i>
-                          {e.choir_name}
-                        </span>
-                      )}
-                      {e.event_date && <span style={{ fontSize: '0.85rem', color: (e.active ?? true) ? undefined : '#aaa' }}>Date : {new Date(e.event_date).toLocaleDateString('fr-FR')}</span>}
-                      <span style={{ fontSize: '0.85rem', color: (e.active ?? true) ? undefined : '#aaa' }}>Code : {formatCode(String(e.code))}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
-                    {/* Icône selon le profil :
-                      - propriétaire ou délégué → poubelle
-                      - rejoint directement → quitter
-                      - membre explicite chorale → rien */}
-                    {(() => {
-                      const isOwner = ownedChoirIds.includes(String(e.choir_id));
-                      const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
-                      const isCreator = userParamId !== null && e.created_by === userParamId;
-                      const isFullMember = isOwner || explicitChoirIds.includes(String(e.choir_id));
-                      if (isOwner) return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)} />;
-                      if (isDelegate && isCreator) return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)} />;
-                      if (!isFullMember) return <i className="fa fa-sign-out trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/leave-event/${e.id}`)} />;
-                      return null;
-                    })()}
-                    {/* Icône offline — toujours affichée */}
-                    <i
-                      className="fa fa-download"
-                      onClick={() => handleOfflineClick(String(e.id), e.name, songIds)}
-                      style={{
-                        fontSize: '1.1rem',
-                        color: isCached ? '#044C8D' : '#ccc',
-                        cursor: (downloading || collecting) ? 'default' : 'pointer',
-                        marginLeft: '0.5rem',
-                        pointerEvents: (downloading || collecting) ? 'none' : 'auto',
-                      }}
-                    />
+                      return (isOwner || (isDelegate && isCreator)) ? 'pointer' : 'default';
+                    })(),
+                  }}
+                />
+                
+                <div
+                  className="text"
+                  onClick={() => navigate(`/event/${e.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <strong style={{ color: (e.active ?? true) ? undefined : '#aaa' }}>{e.name}</strong>
+                  <div style={{ paddingLeft: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', marginTop: '0.2rem' }}>
+                    {e.choir_name && (
+                      <span
+                        onClick={(ev) => { ev.stopPropagation(); navigate(`/choir/${e.choir_id}`); }}
+                        style={{ fontSize: '0.85rem', color: (e.active ?? true) ? '#FB8917' : '#aaa', cursor: 'pointer' }}
+                      >
+                        <i className="fa fa-users" style={{ marginRight: '0.4rem' }}></i>
+                        {e.choir_name}
+                      </span>
+                    )}
+                    {e.event_date && <span style={{ fontSize: '0.85rem', color: (e.active ?? true) ? undefined : '#aaa' }}>Date : {new Date(e.event_date).toLocaleDateString('fr-FR')}</span>}
+                    <span style={{ fontSize: '0.85rem', color: (e.active ?? true) ? undefined : '#aaa' }}>Code : {formatCode(String(e.code))}</span>
                   </div>
                 </div>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    );
-  }
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+                  {/* Icône selon le profil :
+                    - propriétaire ou délégué → poubelle
+                    - rejoint directement → quitter
+                    - membre explicite chorale → rien */}
+                  {(() => {
+                    const isOwner = ownedChoirIds.includes(String(e.choir_id));
+                    const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
+                    const isCreator = userParamId !== null && e.created_by === userParamId;
+                    const isFullMember = isOwner || explicitChoirIds.includes(String(e.choir_id));
+                    if (isOwner) return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)} />;
+                    if (isDelegate && isCreator) return <i className="fa fa-trash trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/delete-event/${e.id}`)} />;
+                    if (!isFullMember) return <i className="fa fa-sign-out trash" style={{ marginLeft: 0 }} onClick={() => navigate(`/leave-event/${e.id}`)} />;
+                    return null;
+                  })()}
+                  {/* Icône offline — toujours affichée */}
+                  <i
+                    className="fa fa-download"
+                    onClick={() => handleOfflineClick(String(e.id), e.name, songIds)}
+                    style={{
+                      fontSize: '1.1rem',
+                      color: isCached ? '#044C8D' : '#ccc',
+                      cursor: (downloading || collecting) ? 'default' : 'pointer',
+                      marginLeft: '0.5rem',
+                      pointerEvents: (downloading || collecting) ? 'none' : 'auto',
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}

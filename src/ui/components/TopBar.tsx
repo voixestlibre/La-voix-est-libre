@@ -11,9 +11,12 @@ interface TopBarProps {
   backUrl?: string;
   helpPage?: string;
   helpProfiles?: UserProfile[];
+  showTimeoutBanner?: boolean;
+  showOfflineBanner?: boolean;
 }
 
-export default function TopBar({ backUrl, helpPage, helpProfiles }: TopBarProps) {
+export default function TopBar({ backUrl, helpPage, helpProfiles,
+  showTimeoutBanner = false, showOfflineBanner = false }: TopBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<any>(null);
@@ -102,7 +105,39 @@ export default function TopBar({ backUrl, helpPage, helpProfiles }: TopBarProps)
   const showHelp = !!helpPage && !!helpProfiles && helpProfiles.length > 0;
 
   return (
-    <>
+    <>    
+      {/* Bandeau réseau lent — cliquable pour recharger */}
+      {showTimeoutBanner && (
+        <div
+          onClick={() => window.location.reload()}
+          style={{
+            backgroundColor: '#FFF3CD', borderTop: '1px solid #FFB300',
+            borderBottom: '1px solid #FFB300', padding: '0.5rem 1rem',
+            fontSize: '0.85rem', color: '#856404', marginBottom: '0.85rem',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem',
+          }}
+        >
+          <i className="fa fa-triangle-exclamation" style={{ flexShrink: 0 }} />
+          <span>Chargement incomplet (réseau lent) — Appuyez pour recharger.</span>
+          <i className="fa fa-rotate-right" style={{ marginLeft: 'auto', flexShrink: 0 }} />
+        </div>
+      )}
+
+      {/* Bandeau mode offline */}
+      {showOfflineBanner && (
+        <div
+          style={{
+            backgroundColor: '#E8F4FD', borderTop: '1px solid #044C8D',
+            borderBottom: '1px solid #044C8D', padding: '0.5rem 1rem',
+            fontSize: '0.85rem', color: '#044C8D', marginBottom: '0.85rem',
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+          }}
+        >
+          <i className="fa fa-wifi" style={{ flexShrink: 0 }} />
+          <span>Mode hors-ligne — Affichage des données sauvegardées lors de votre dernière visite.</span>
+        </div>
+      )}
+
       <div className="top-bar">
         {/* Gauche : Maison (menu déroulant) puis < */}
         <div style={{ display: 'flex', gap: '0.2rem', position: 'relative' }} ref={menuRef}>

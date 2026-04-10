@@ -5,26 +5,56 @@ import { translateSupabaseError } from '../../infrastructure/storage/translateSu
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
+import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<{ email: string; isAdmin: boolean } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
+  // Gestion du spinner et des bandeaux réseau
+  const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
+    setShowOfflineBanner, forceOffline, cancelled } = usePageLoader();  
+
+  // Basculement forcé en mode offline (timeout atteint pendant le spinner)
+  useEffect(() => {
+    if (!forceOffline) return;
+    setLoading(false);
+  }, [forceOffline]);
+
   // Vérifier si l'utilisateur est déjà connecté au chargement
   useEffect(() => {
+    // Lancer le spinner
+    setLoading(true);
+
     const init = async () => {
+      // Test réseau au chargement
+      try {
+        await fetch('https://www.larminat.fr/lavoixestlibre/favicon.ico', {
+          method: 'HEAD', mode: 'no-cors', cache: 'no-store',
+        });
+        // Si timeout déclenché
+        if (cancelled.current) return;
+      } catch {
+        // Déclenchement de la bannière Offline
+        if (!cancelled.current) setShowOfflineBanner(true);
+      }
       const currentUser = await getCurrentUser();
+      // Si timeout déclenché
+      if (cancelled.current) return;
+
       if (currentUser) {
         setUser({ email: currentUser.email!, isAdmin: false });
       }
-      setPageLoading(false);
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
+
+      setLoading(false);
     };
     init();
   }, []);
@@ -68,16 +98,22 @@ export default function LoginPage() {
 
   return (
     <div className="page-container">
-      <TopBar helpPage="login" helpProfiles={helpProfiles} />
+      <TopBar helpPage="login" helpProfiles={helpProfiles} 
+        showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
 
-      {pageLoading || loading ? <div className="spinner"></div> : (
+      {loading ? <div className="spinner"></div> : (
         <>
           {user ? (
             <>
               {/* Utilisateur connecté : afficher son email et le bouton de déconnexion */}
               <h2>Déconnexion</h2>
               <p>Utilisateur connecté : {user.email}</p>
-              <button type="button" className="page-button" onClick={handleLogout}>
+              {/* Bouton désactivé si offline ou timeOut */}
+              <button type="button" className="page-button" 
+                disabled={showOfflineBanner || showTimeoutBanner}
+                style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                onClick={handleLogout}
+              >
                 Se déconnecter
               </button>
             </>
@@ -108,14 +144,23 @@ export default function LoginPage() {
                     }}
                   />
                 </div>
-                <button type="submit" className="page-button">
+                {/* Bouton désactivé si offline ou timeOut */}
+                <button type="submit" 
+                  className="page-button"
+                  disabled={showOfflineBanner || showTimeoutBanner}
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                >
                   Se connecter
                 </button>
               </form>
 
               {/* Lien vers la réinitialisation du mot de passe */}
-              <button type="button" className="page-button2" style={{ marginTop: '0.5rem' }}
-                onClick={() => navigate('/reset-request')}>
+              {/* Bouton désactivé si offline ou timeOut */}
+              <button type="button" className="page-button2" 
+                disabled={showOfflineBanner || showTimeoutBanner}
+                style={{ marginTop: '0.5rem', opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                onClick={() => navigate('/reset-request')}
+              >
                 Réinitialiser le mot de passe
               </button>
             </>

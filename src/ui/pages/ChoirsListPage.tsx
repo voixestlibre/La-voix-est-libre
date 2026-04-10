@@ -7,6 +7,7 @@ import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } fr
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
+import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function MyChoirsPage() {
   const [user, setUser] = useState<any>(null);
@@ -17,16 +18,49 @@ export default function MyChoirsPage() {
   // Elles apparaissent dans la liste mais sans code ni icône d'action,
   // et ne sont jamais stockées dans joined_choirs.
   const [ghostChoirs, setGhostChoirs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [canCreate, setCanCreate] = useState(false);
   const navigate = useNavigate();
   // Profils pour l'aide
   const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
+  // Gestion du spinner et des bandeaux réseau
+  const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
+    setShowOfflineBanner, forceOffline, cancelled } = usePageLoader();
+
+  // Basculement forcé en mode offline (timeout atteint pendant le spinner)
+  useEffect(() => {
+    if (!forceOffline) return;
+    const joined = getStoredChoirs();
+    const fallback = joined.map((c) => ({ id: c.id, name: c.name, code: c.code }));
+    setChoirs(fallback);
+    // Calculer les chorales fantômes depuis le localStorage
+    const storedEv = getStoredEvents();
+    const ghosts = storedEv
+      .filter((e) => e.choir_id && e.choir_name && !fallback.find((c) => String(c.id) === String(e.choir_id)))
+      .reduce((acc: any[], e) => {
+        if (!acc.find((c) => String(c.id) === String(e.choir_id))) {
+          acc.push({ id: e.choir_id, name: e.choir_name, code: null, ghost: true });
+        }
+        return acc;
+      }, []);
+    setGhostChoirs(ghosts);
+    // Profils d'aide offline
+    const profiles: UserProfile[] = [];
+    if (joined.length > 0) profiles.push('member');
+    else if (storedEv.length > 0) profiles.push('guest');
+    else profiles.push('anonymous');
+    setHelpProfiles(profiles);
+    setLoading(false);
+  }, [forceOffline]);
 
   useEffect(() => {
+    // Lancer le spinner
+    setLoading(true);
+
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté (peut être null si non connecté)
       const currentUser = await getCurrentUser();
+      // Si timeout déclenché
+      if (cancelled.current) return;
 
       // Lire les chorales mémorisées dans le localStorage
       // Format : [{ id, code: '12345678', name: 'Ma chorale' }, ...]
@@ -47,11 +81,16 @@ export default function MyChoirsPage() {
         // Connecté : vérifier le quota
         try {
           const param = await getUserParam(currentUser.email!);
+          // Si timeout déclenché
+          if (cancelled.current) return;
+
           if (!param || param.choirs_nb === 0) {
             navigate('/', { replace: true });
             return;
           }
         } catch {
+          // Déclenchement de la bannière Offline
+          if (!cancelled.current) setShowOfflineBanner(true);
           // Offline : on laisse passer — on ne peut pas vérifier le quota
         }
       }
@@ -73,9 +112,13 @@ export default function MyChoirsPage() {
         try {
           // Récupérer le quota de chorales autorisées pour cet utilisateur
           const param = await getUserParam(currentUser.email!);
+          // Si timeout déclenché
+          if (cancelled.current) return;
 
           // Récupérer les chorales dont l'utilisateur est propriétaire depuis Supabase
           const choirData = await getOwnedChoirs(currentUser.id);
+          // Si timeout déclenché
+          if (cancelled.current) return;
 
           // Déterminer si l'utilisateur peut encore créer une chorale
           // (nombre de chorales possédées < quota autorisé)
@@ -98,6 +141,8 @@ export default function MyChoirsPage() {
           if (joinedCodes.length > 0) {
             // Vérifier en base que les chorales rejointes via localStorage existent toujours
             const joinedData = await getChoirsByCodes(joinedCodes);
+            // Si timeout déclenché
+            if (cancelled.current) return;
 
             // Construire la liste des codes valides :
             // chorales rejointes qui existent encore en base + chorales propriétaires
@@ -126,6 +171,8 @@ export default function MyChoirsPage() {
             allLoadedChoirs = choirData;
           }
         } catch {
+          // Déclenchement de la bannière Offline
+          if (!cancelled.current) setShowOfflineBanner(true);
           // Fallback offline : Supabase inaccessible
           // Reconstituer des objets minimalistes depuis le localStorage pour l'affichage
           const fallback = joined.map((c) => ({ id: c.id, name: c.name, code: c.code }));
@@ -139,6 +186,8 @@ export default function MyChoirsPage() {
           try {
             // Vérifier en base que les chorales rejointes via localStorage existent toujours
             const joinedData = await getChoirsByCodes(joinedCodes);
+            // Si timeout déclenché
+            if (cancelled.current) return;
 
             // Purger le localStorage : supprimer les chorales qui n'existent plus en base
             const validCodes = joinedData.map((c) => String(c.code));
@@ -147,6 +196,8 @@ export default function MyChoirsPage() {
             setChoirs(joinedData);
             allLoadedChoirs = joinedData;
           } catch {
+            // Déclenchement de la bannière Offline
+            if (!cancelled.current) setShowOfflineBanner(true);
             // Fallback offline : Supabase inaccessible
             const fallback = joined.map((c) => ({ id: c.id, name: c.name, code: c.code }));
             setChoirs(fallback);
@@ -157,6 +208,9 @@ export default function MyChoirsPage() {
           setChoirs([]);
         }
       }
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
 
       // ── Pourquoi synchroniser les événements ici ? ──────────────────────────
       // MyChoirsPage est la page "hub" de l'application — elle est visitée
@@ -174,6 +228,8 @@ export default function MyChoirsPage() {
         const eventsFromChoirs = choirIds.length > 0
           ? await getEventsByChoirIds(choirIds)
           : [];
+        // Si timeout déclenché
+        if (cancelled.current) return;
 
         // PARTIE 2 : vérifier les événements rejoints directement via un code
         // (ceux dont la chorale de rattachement n'est pas dans allLoadedChoirs)
@@ -189,6 +245,8 @@ export default function MyChoirsPage() {
         const eventsFromCodes = directEventCodes.length > 0
           ? await getEventsByCodes(directEventCodes)
           : [];
+        // Si timeout déclenché
+        if (cancelled.current) return;
 
         // PARTIE 3 : fusionner les deux sources sans doublons
         // eventsFromChoirs = tous les événements des chorales connues
@@ -231,6 +289,9 @@ export default function MyChoirsPage() {
             active: ev.active ?? existingEvent?.active ?? true,
           };
         }));
+        // Si timeout déclenché
+        if (cancelled.current) return;
+
         setStoredEvents(updatedEvents);
         
         // ── Chorales fantômes ───────────────────────────────────────────────────
@@ -265,6 +326,8 @@ export default function MyChoirsPage() {
         setGhostChoirs(ghosts);
 
       } catch {
+        // Déclenchement de la bannière Offline
+        if (!cancelled.current) setShowOfflineBanner(true);
         // Offline ou erreur Supabase : on conserve le localStorage tel quel.
         // On calcule quand même les chorales fantômes depuis le localStorage existant.
         const existingEvents = getStoredEvents();
@@ -282,6 +345,9 @@ export default function MyChoirsPage() {
           }, []);
         setGhostChoirs(ghosts);
       }
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
 
       // Construire les profils d'aide
       const profiles: UserProfile[] = [];
@@ -312,6 +378,9 @@ export default function MyChoirsPage() {
       }
       setHelpProfiles(profiles);
 
+      // Si timeout déclenché
+      if (cancelled.current) return;
+
       setLoading(false);
     };
 
@@ -328,7 +397,8 @@ export default function MyChoirsPage() {
 
   return (
     <div className="page-container">
-      <TopBar helpPage="my-choirs" helpProfiles={helpProfiles} />
+      <TopBar helpPage="my-choirs" helpProfiles={helpProfiles}
+        showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
       <h2>Mes chorales</h2>
 
       {loading ? (
@@ -372,10 +442,12 @@ export default function MyChoirsPage() {
       {/* Bouton création visible uniquement si le quota n'est pas atteint */}
       {canCreate && (
         <div>
+          {/* Bouton désactivé si offline ou timeOut */}
           <button
             className="page-button"
+            disabled={showOfflineBanner || showTimeoutBanner}
+            style={{ marginTop: '1rem', opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
             onClick={() => navigate('/create-choir')}
-            style={{ marginBottom: '0.5rem' }}
           >
             <i className="fa fa-users"></i> &nbsp;
             Créer une chorale

@@ -10,6 +10,7 @@ import { getCachedFileUrl } from '../../infrastructure/storage/cacheService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
+import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function EventPage() {
   const { eventId } = useParams();
@@ -19,7 +20,6 @@ export default function EventPage() {
   const [songs, setSongs] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [isDirectEventMember, setIsDirectEventMember] = useState(false);
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -29,6 +29,31 @@ export default function EventPage() {
   const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
+
+  // Gestion du spinner et des bandeaux réseau
+  const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
+    setShowOfflineBanner, forceOffline, cancelled } = usePageLoader();  
+
+
+  // States pour l'export de fichier zip
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState<{done: number; total: number} | null>(null);
+
+  // Fonction permettant de générer un fichier .zip
+  const handleExport = async () => {
+    setExporting(true);
+    setExportProgress({ done: 0, total: 1 });
+    try {
+      const { exportEventAsZip } = await import('../../infrastructure/storage/exportService');
+      await exportEventAsZip(eventId!, event.name, (done, total) => {
+        setExportProgress({ done, total });
+      });
+    } catch (err: any) {
+      alert(`Erreur export : ${err.message}`);
+    }
+    setExporting(false);
+    setExportProgress(null);
+  };
 
   // Fonction permettant de générer un fichier pdf global
   const handleGenerateLivret = async () => {
@@ -192,10 +217,38 @@ export default function EventPage() {
     }
   };  
 
+  // Basculement forcé en mode offline (timeout atteint pendant le spinner)
   useEffect(() => {
+    if (!forceOffline) return;
+    const storedChoirs = getStoredChoirs();
+    const storedEvents = getStoredEvents();
+    const storedEvent = storedEvents.find((e) => String(e.id) === String(eventId));
+    const choirId = storedEvent?.choir_id;
+    const isChoirMember = choirId ? storedChoirs.some((c) => String(c.id) === String(choirId)) : false;
+    const hasLocalAccess = !!storedEvent || isChoirMember;  
+    if (!hasLocalAccess) { navigate('/'); return; }
+    if (storedEvent) { setEvent({ id: storedEvent.id, name: storedEvent.name, code: storedEvent.code, choir_id: storedEvent.choir_id, event_date: storedEvent.event_date ?? null, });
+      setChoirName(storedEvent?.choir_name ?? null);
+      setSongs(storedEvent.songs ?? []);
+    } else { setSongs([]); }
+    const profiles: UserProfile[] = [];
+    if (isChoirMember) profiles.push('member');
+    else if (storedEvent) profiles.push('guest');
+    else profiles.push('anonymous');
+    setHelpProfiles(profiles);
+    setLoading(false);
+  }, [forceOffline]);
+
+  useEffect(() => {
+    // Lancer le spinner
+    setLoading(true);
+
     const fetchData = async () => {
       // Récupérer l'utilisateur connecté (peut être null)
       const currentUser = await getCurrentUser();
+
+      // Si timeout déclenché
+      if (cancelled.current) return;      
 
       // ── Vérifier les droits d'accès depuis le localStorage ───────────
       // joined_choirs : chorales rejointes explicitement (code connu)
@@ -230,19 +283,33 @@ export default function EventPage() {
         const eventData = await getEvent(eventId!);
         setEvent(eventData);
 
+        // Si timeout déclenché
+        if (cancelled.current) return;
+
         // Récupérer le nom de la chorale pour l'affichage
         const choirData = await getChoir(String(eventData.choir_id));
         if (choirData) setChoirName(choirData.name);
 
+        // Si timeout déclenché
+        if (cancelled.current) return;        
+
         // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(String(eventData.choir_id));
         const ownerCheck = currentUser && ownerId === currentUser.id;
+
+        // Si timeout déclenché
+        if (cancelled.current) return;        
+
         if (ownerCheck) setIsOwner(true);
         ownerCheckLocal = !!(currentUser && ownerId === currentUser.id);
 
         // Vérifier si l'utilisateur est le créateur de l'événement
         const userParamId = currentUser ? await getUserParamId(currentUser.email!) : null;
         const creatorCheck = userParamId !== null && eventData.created_by === userParamId;
+
+        // Si timeout déclenché
+        if (cancelled.current) return;        
+
         if (creatorCheck) setIsCreator(true);
         creatorCheckLocal = !!(userParamId !== null && eventData.created_by === userParamId);
 
@@ -265,11 +332,17 @@ export default function EventPage() {
         const songsData = await getEventSongsDetails(eventId!);
         setSongs(songsData);
 
+        // Si timeout déclenché
+        if (cancelled.current) return;        
+
         // Le compteur de vues est incrémenté de façon silencieuse (.catch) pour ne pas
         // bloquer l'affichage en cas d'erreur réseau.    
         incrementEventViews(String(eventId)).catch(() => {});
 
       } catch {
+        // Déclenchement de la bannière Offline
+        if (!cancelled.current) setShowOfflineBanner(true);
+
         // ── Fallback offline ─────────────────────────────────────────────
         // Supabase inaccessible : on reconstruit ce qu'on peut depuis le localStorage
 
@@ -312,6 +385,9 @@ export default function EventPage() {
       }
       setHelpProfiles(profiles);
 
+      // Si timeout déclenché
+      if (cancelled.current) return;
+
       setLoading(false);
     };
     fetchData();
@@ -330,7 +406,8 @@ export default function EventPage() {
 
   return (
     <div className="page-container">
-      <TopBar helpPage="event" helpProfiles={helpProfiles} />
+      <TopBar helpPage="event" helpProfiles={helpProfiles} 
+        showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
       
       {loading ? <div className="spinner"></div> : (
         <>
@@ -413,8 +490,11 @@ export default function EventPage() {
               ayant rejoint l'événement directement (pas via la chorale) */}
           {!isOwner && isDirectEventMember && (
             <div style={{ marginTop: '1.5rem' }}>
-              <button
+              {/* Bouton désactivé si offline ou timeOut */}
+              <button              
                 className="page-button pink"
+                disabled={showOfflineBanner || showTimeoutBanner}
+                style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}                
                 onClick={() => navigate(`/leave-event/${eventId}`)}
               >
                 <i className="fa fa-sign-out"></i> &nbsp;
@@ -473,12 +553,33 @@ export default function EventPage() {
             </div>
           )}          
 
+          {/* Téléchargement de l'évènement au format .zip */}
+          <div style={{ marginTop: '1.5rem' }}>
+            {/* Bouton désactivé si offline ou timeOut */}
+            <button 
+              className="page-button pink" 
+              onClick={handleExport} 
+              disabled={exporting || showOfflineBanner || showTimeoutBanner}
+              style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+            >
+              <i className="fa fa-download"></i>&nbsp;
+              {exporting
+                ? `Export... ${exportProgress ? Math.round(exportProgress.done / exportProgress.total * 100) : 0}%`
+                : showOfflineBanner || showTimeoutBanner
+                ? 'Téléchargement indisponible'
+                : 'Télécharger l\'événement'}
+            </button>
+          </div>
+
           {/* Boutons modification / suppression (propriétaire ou délégué) */}
           {(isOwner || isCreator) && (
             <>
               <div style={{ marginTop: '2.5rem' }}>
+                {/* Bouton désactivé si offline ou timeOut */}
                 <button
                   className="page-button pink"
+                  disabled={showOfflineBanner || showTimeoutBanner}
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
                   onClick={() => navigate(`/edit-event/${event.id}`)}
                 >
                   <i className="fa fa-calendar-days"></i> &nbsp;
@@ -486,8 +587,11 @@ export default function EventPage() {
                 </button>
               </div>
               <div style={{ marginTop: '1.5rem' }}>
+                {/* Bouton désactivé si offline ou timeOut */}
                 <button
                   className="page-button pink"
+                  disabled={showOfflineBanner || showTimeoutBanner}
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
                   onClick={() => navigate(`/delete-event/${event.id}`)}
                 >
                   <i className="fa fa-calendar-days"></i> &nbsp;

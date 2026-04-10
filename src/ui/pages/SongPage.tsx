@@ -11,6 +11,7 @@ import { getChoirOwner } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
+import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function SongPage() {
   const { songId } = useParams();
@@ -21,7 +22,6 @@ export default function SongPage() {
   const [files, setFiles] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [isDelegate, setIsDelegate] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   // ── Navigation par swipe ─────────────────────────────────────────────
   // songList est transmis dans location.state par la page appelante (ChoirPage, EventPage)
@@ -87,6 +87,58 @@ export default function SongPage() {
   // ── Aide contextuelle ─────────────────────────────────────────────────
   const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
+  // Gestion du spinner et des bandeaux réseau
+  const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
+    setShowOfflineBanner, forceOffline, cancelled, reset } = usePageLoader();
+
+  // Basculement forcé en mode offline (timeout atteint pendant le spinner)
+  useEffect(() => {
+    if (!forceOffline) return;    
+    const storedEvents = getStoredEvents();
+    const matchingEvent = storedEvents.find((e) =>
+      e.songs?.some((s) => String(s.id) === String(songId))
+    );
+    if (!matchingEvent) { navigate('/my-choirs', { replace: true }); return; }    
+    const cachedSong = matchingEvent.songs.find((s) => String(s.id) === String(songId));
+    if (cachedSong) setSong({
+      id: cachedSong.id, title: cachedSong.title,
+      choir_id: matchingEvent.choir_id, hashtags: [],
+    });  
+    const cachedEvent = getCachedEvent();
+    if (!cachedEvent?.cached_files) {
+      setFiles([]);
+      setLoading(false);
+      return;
+    }
+    // Async mais avec setLoading(false) garanti dans les deux branches
+    const buildOfflineFiles = async () => {
+      try {
+        const offlineFiles: { name: string }[] = [];
+        for (const f of cachedEvent.cached_files!.filter(
+          (f) => String(f.songId) === String(songId)
+        )) {
+          const publicUrl = f.url ?? getSongFileUrl(String(songId), f.fileName);
+          const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
+          if (cachedUrl) offlineFiles.push({ name: f.fileName });
+        }
+        offlineFiles.sort((a, b) => {
+          const extA = a.name.split('.').pop()?.toLowerCase() || '';
+          const extB = b.name.split('.').pop()?.toLowerCase() || '';
+          const isAudioA = ['mp3', 'wav', 'ogg', 'm4a'].includes(extA);
+          const isAudioB = ['mp3', 'wav', 'ogg', 'm4a'].includes(extB);
+          if (isAudioA !== isAudioB) return isAudioA ? 1 : -1;
+          return a.name.localeCompare(b.name);
+        });
+        setFiles(offlineFiles);
+        setIsOffline(true);
+      } finally {
+        // setLoading(false) garanti même en cas d'erreur
+        setLoading(false);
+      }
+    };
+    buildOfflineFiles();
+  }, [forceOffline, songId]);
+    
   // ── Chargement des titres adjacents ──────────────────────────────────
   // Chargés une seule fois quand l'index change pour l'aperçu swipe
   // Note : si songList change (navigation vers un autre chant), hasPrev/hasNext
@@ -95,17 +147,30 @@ export default function SongPage() {
   useEffect(() => {
     const loadAdjacentTitles = async () => {
       if (!songList) return;
+
+      const getTitleOffline = (targetId: string): string => {
+        for (const e of getStoredEvents()) {
+          const s = e.songs?.find((s) => String(s.id) === String(targetId));
+          if (s) return s.title;
+        }
+        return '';
+      };
+  
       if (hasPrev) {
         try {
           const s = await getSong(songList[currentIndex - 1]);
           setPrevTitle(s.title);
-        } catch { setPrevTitle(''); }
+        } catch { 
+          setPrevTitle(getTitleOffline(songList[currentIndex - 1]));
+        }
       }
       if (hasNext) {
         try {
           const s = await getSong(songList[currentIndex + 1]);
           setNextTitle(s.title);
-        } catch { setNextTitle(''); }
+        } catch { 
+          setNextTitle(getTitleOffline(songList[currentIndex + 1])); 
+        }
       }
     };
     loadAdjacentTitles();
@@ -118,20 +183,23 @@ export default function SongPage() {
 
   // ── Chargement principal ──────────────────────────────────────────────
   useEffect(() => {
-    const fetchData = async () => {
-      // Reset de tous les states au changement de chant
-      // (important pour la navigation par swipe qui ne recharge pas la page)
-      setFiles([]);
-      setIsOffline(false);
-      setSong(null);
-      setIsOwner(false);
-      setIsDelegate(false);
-      setCachedEventIdState(null);
-      setDownloadedFiles(new Set());
-      setLoading(true);
+    // Reset de tous les states au changement de chant
+    // (important pour la navigation par swipe qui ne recharge pas la page)
+    setSong(null);
+    setFiles([]);
+    setIsOffline(false);
+    setIsOwner(false);
+    setIsDelegate(false);
+    setCachedEventIdState(null);
+    setDownloadedFiles(new Set());
 
-      const currentUser = await getCurrentUser();
+    reset();
+    // Lancer le spinner
+    setLoading(true);
+
+    const fetchData = async () => {      
       const storedEvents = getStoredEvents();
+      let currentUser = null;
 
       // Variables locales pour les profils d'aide — le state React n'est pas
       // encore mis à jour au moment où on construit les profils
@@ -141,14 +209,33 @@ export default function SongPage() {
       try {
         // ── Mode online ───────────────────────────────────────────────
         const songData = await getSong(songId!);
+        // Si timeout déclenché
+        if (cancelled.current) return;      
+
         setSong(songData);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;      
+        
+        currentUser = await getCurrentUser();        
+
+        // Si timeout déclenché
+        if (cancelled.current) return;      
 
         // Charger les hashtags connus de la chorale pour l'autocomplétion
         const known = await getChoirHashtags(songData.choir_id);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;        
+
         setAllHashtags(known);
 
         // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(songData.choir_id);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;
+
         const ownerCheck = currentUser && ownerId === currentUser.id;
         if (ownerCheck) setIsOwner(true);
         ownerCheckLocal = ownerCheck ?? false;
@@ -158,6 +245,9 @@ export default function SongPage() {
         const delegateCheck = delegations.includes(String(songData.choir_id));
         setIsDelegate(delegateCheck);
         delegateCheckLocal = delegateCheck;
+
+        // Si timeout déclenché
+        if (cancelled.current) return;        
 
         // Contrôle d'accès :
         // - propriétaire → accès total (upload, suppression, hashtags)
@@ -172,6 +262,9 @@ export default function SongPage() {
         }
 
         await fetchFiles(songData.title, songData.code ?? undefined);
+
+        // Si timeout déclenché
+        if (cancelled.current) return;        
 
         // Incrémenter le compteur de vues silencieusement
         incrementSongViews(String(songId)).catch(() => {});
@@ -191,6 +284,9 @@ export default function SongPage() {
               const publicUrl = f.url ?? getSongFileUrl(String(songId), f.fileName);
               const cachedUrl = await getCachedFileUrl(String(cachedEvent.id), publicUrl);
               if (cachedUrl) downloaded.add(f.fileName);
+
+              // Si timeout déclenché
+              if (cancelled.current) return;              
             }
             setDownloadedFiles(downloaded);
           }
@@ -198,6 +294,9 @@ export default function SongPage() {
       } catch {
         // ── Fallback offline ──────────────────────────────────────────
         // Supabase inaccessible : reconstituer depuis le localStorage et le cache
+
+        // Déclenchement de la bannière Offline
+        if (!cancelled.current) setShowOfflineBanner(true);
 
         // Vérifier que le chant est accessible via un événement en localStorage
         const matchingEvent = storedEvents.find((e) =>
@@ -262,6 +361,9 @@ export default function SongPage() {
         }
       }
       setHelpProfiles(profiles);
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
 
       setLoading(false);
     };
@@ -698,7 +800,8 @@ export default function SongPage() {
             padding: '1rem',
             boxSizing: 'border-box',
           }}>
-            <TopBar helpPage="song" helpProfiles={[]} />
+            <TopBar helpPage="song" helpProfiles={[]} 
+              showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
             <h2 style={{ marginTop: '1rem', marginLeft: '5rem' }}>
               <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
               {prevTitle}
@@ -717,7 +820,8 @@ export default function SongPage() {
             padding: '1rem',
             boxSizing: 'border-box',
           }}>
-            <TopBar helpPage="song" helpProfiles={[]} />
+            <TopBar helpPage="song" helpProfiles={[]} 
+              showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
             <h2 style={{ marginTop: '1rem', marginRight: '5rem' }}>
               <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
               {nextTitle}
@@ -739,9 +843,10 @@ export default function SongPage() {
             transition: isSwiping ? 'none' : 'transform 0.25s ease',
           }}
         >
-          <TopBar helpPage="song" helpProfiles={helpProfiles} />
+          <TopBar helpPage="song" helpProfiles={helpProfiles} 
+            showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
 
-          {loading ? <div className="spinner"></div> : (
+          {loading || !song ? <div className="spinner"></div> : (
             <>
               <h2>
                 <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
@@ -831,7 +936,7 @@ export default function SongPage() {
                           setHashtagSuggestions([]);
                         }, 150);
                       }}
-                      style={{ borderRadius: '20px', padding: '0.3rem 0.8rem', border: '2px solid #DA486D', fontSize: '0.85rem', outline: 'none', width: '130px' }}
+                      style={{ borderRadius: '20px', padding: '0.3rem 0.8rem', border: '2px solid #DA486D', fontSize: '16px', outline: 'none', width: '130px' }}
                     />
                     {hashtagSuggestions.length > 0 && (
                       <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', overflow: 'hidden', minWidth: '160px', zIndex: 100 }}>
@@ -873,7 +978,10 @@ export default function SongPage() {
                         <strong>
                           {getDisplayName(f.name)}
                           {isInstruments(f.name) && (
-                            <i className="fa fa-music" style={{ color: '#DA486D', marginLeft: '0.4rem' }} />
+                            <i className="fa fa-guitar" style={{ color: '#DA486D', marginLeft: '0.4rem' }} />
+                          )}
+                          {isInstruments(f.name) && (
+                            <i className="fa fa-drum" style={{ color: '#DA486D', marginLeft: '0.4rem' }} />
                           )}
                         </strong>
                       </div>
@@ -922,17 +1030,31 @@ export default function SongPage() {
                     </div>
                     <input type="text" placeholder="Nom du fichier" value={label}
                       onChange={(e) => setLabel(e.target.value)} required className="page-form-input" />
-                    <button className="page-button" type="submit" disabled={uploading}>
+                    {/* Bouton désactivé si offline ou timeOut */}
+                    <button className="page-button" type="submit" 
+                      disabled={uploading  || showOfflineBanner || showTimeoutBanner}
+                      style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                    >
                       {uploading ? 'Envoi...' : 'Ajouter'}
                     </button>
                   </form>
                   <div>
-                    <button className="page-button pink" onClick={() => navigate(`/edit-song/${song.id}`)} style={{ marginTop: '2.5rem' }}>
+                    {/* Bouton désactivé si offline ou timeOut */}
+                    <button className="page-button pink" 
+                      onClick={() => navigate(`/edit-song/${song.id}`)} 
+                      disabled={showOfflineBanner || showTimeoutBanner}
+                      style={{ marginTop: '2.5rem', opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                      >
                       <i className="fa fa-music"></i> &nbsp; Modifier le chant
                     </button>
                   </div>
                   <div>
-                    <button className="page-button pink" onClick={() => navigate(`/delete-song/${song.id}`)} style={{ marginTop: '1.5rem' }}>
+                    {/* Bouton désactivé si offline ou timeOut */}
+                    <button className="page-button pink" 
+                      onClick={() => navigate(`/delete-song/${song.id}`)} 
+                      disabled={showOfflineBanner || showTimeoutBanner}
+                      style={{ marginTop: '1.5rem', opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                    >
                       <i className="fa fa-music"></i> &nbsp; Supprimer le chant
                     </button>
                   </div>

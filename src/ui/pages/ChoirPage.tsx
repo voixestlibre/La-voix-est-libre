@@ -8,6 +8,7 @@ import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/l
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
+import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function ChoirPage() {
   const { id } = useParams();
@@ -19,7 +20,6 @@ export default function ChoirPage() {
   const [isFullMember, setIsFullMember] = useState(false);
   const [songs, setSongs] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'events' | 'songs'>('events');
   const [groupByHashtag, setGroupByHashtag] = useState(false);
 
@@ -32,20 +32,61 @@ export default function ChoirPage() {
 
   const [helpProfiles, setHelpProfiles] = useState<UserProfile[]>([]);
 
+  // Gestion du spinner et des bandeaux réseau
+  const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
+    setShowOfflineBanner, forceOffline, cancelled } = usePageLoader();
+
+  // Basculement forcé en mode offline (timeout atteint pendant le spinner)
   useEffect(() => {
+    if (!forceOffline) return;
+    const joinedChoirs = getStoredChoirs();
+    const joinedEvents = getStoredEvents();
+    const isInJoinedChoirs = joinedChoirs.some((c: any) => String(c.id) === String(id));
+    const hasDirectEvent = joinedEvents.some((e: any) => String(e.choir_id) === String(id));
+    if (!isInJoinedChoirs && !hasDirectEvent) { navigate('/'); return; }
+    const choirFromStorage = joinedChoirs.find((c: any) => String(c.id) === String(id));
+    if (choirFromStorage) {
+      setChoir({ id: choirFromStorage.id, name: choirFromStorage.name, code: choirFromStorage.code });
+      setIsFullMember(true);
+    } else {
+      const eventWithChoir = joinedEvents.find((e: any) => String(e.choir_id) === String(id));
+      if (eventWithChoir) setChoir({ id, name: eventWithChoir.choir_name, code: null });
+    }
+    const offlineEvents = joinedEvents
+      .filter((e: any) => String(e.choir_id) === String(id))
+      .map((e: any) => ({ id: e.id, name: e.name, code: e.code, event_date: e.event_date }))
+      .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime());
+    setEvents(offlineEvents);
+    setSongs([]);
+    setLoading(false);  
+  }, [forceOffline]);
+
+  useEffect(() => {
+    // Lancer le spinner
+    setLoading(true);
+
     const fetchChoir = async () => {
       // Récupérer l'utilisateur connecté (peut être null)
       const currentUser = await getCurrentUser();
 
+      // Si timeout déclenché
+      if (cancelled.current) return;
+
       // Vérifier si l'utilisateur a la délégation pour cette chorale
       const delegations = currentUser ? await getUserDelegations(currentUser.email!) : [];
       setIsDelegate(delegations.includes(String(id)));
+
+      // Si timeout déclenché
+      if (cancelled.current) return;      
 
       // Récupérer l'id dans users_param pour identifier les événements créés par le délégué
       if (currentUser) {
         const paramId = await getUserParamId(currentUser.email!);
         setUserParamId(paramId);
       }
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
 
       // ── Vérifier les droits d'accès depuis le localStorage ───────────
       // joined_choirs : chorales rejointes explicitement (code connu)
@@ -76,6 +117,9 @@ export default function ChoirPage() {
         const data = await getChoir(id!);
         setChoir(data);
 
+        // Si timeout déclenché
+        if (cancelled.current) return;
+
         // Vérifier si l'utilisateur connecté est le propriétaire
         const ownerCheck = currentUser && data.owner_id === currentUser.id;
         ownerCheckLocal = !!ownerCheck;
@@ -103,6 +147,9 @@ export default function ChoirPage() {
         ]);
         setSongs(songsData);
 
+        // Si timeout déclenché
+        if (cancelled.current) return;        
+
         // Filtrer les événements selon les droits :
         // - propriétaire ou membre explicite → tous les événements
         // - accès via événement direct uniquement → uniquement les événements autorisés
@@ -113,6 +160,9 @@ export default function ChoirPage() {
         }
 
       } catch {
+        // Déclenchement de la bannière Offline
+        if (!cancelled.current) setShowOfflineBanner(true);
+
         // ── Fallback offline ─────────────────────────────────────────────
         // Supabase inaccessible : on reconstruit ce qu'on peut depuis le localStorage
 
@@ -174,6 +224,9 @@ export default function ChoirPage() {
         else profiles.push('anonymous');
       }
       setHelpProfiles(profiles);      
+
+      // Si timeout déclenché
+      if (cancelled.current) return;
 
       setLoading(false);
     };
@@ -262,7 +315,8 @@ export default function ChoirPage() {
 
   return (
     <div className="page-container">
-      <TopBar helpPage="choir" helpProfiles={helpProfiles} />
+      <TopBar helpPage="choir" helpProfiles={helpProfiles} 
+        showTimeoutBanner={showTimeoutBanner} showOfflineBanner={showOfflineBanner} />
       {loading ? <div className="spinner"></div> : (
         <>
           <h2>
@@ -379,8 +433,11 @@ export default function ChoirPage() {
               {/* Bouton ajout événement (propriétaire uniquement) */}
               {(isOwner || isDelegate) && (
                 <div>
+                  {/* Bouton désactivé si offline ou timeOut */}
                   <button
                     className="page-button"
+                    disabled={showOfflineBanner || showTimeoutBanner}
+                    style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
                     onClick={() => navigate(`/add-event/${choir.id}`)}
                   >
                     <i className="fa fa-calendar-days"></i> &nbsp;
@@ -662,12 +719,22 @@ export default function ChoirPage() {
               {isOwner && (
                 <>
                   <div>
-                    <button className="page-button" onClick={() => navigate(`/add-song/${choir.id}`)}>
+                    {/* Bouton désactivé si offline ou timeOut */}
+                    <button className="page-button" 
+                      disabled={showOfflineBanner || showTimeoutBanner} 
+                      style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                      onClick={() => navigate(`/add-song/${choir.id}`)}
+                    >
                       <i className="fa fa-music"></i> &nbsp; Ajouter un chant
                     </button>
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
-                    <button className="page-button" onClick={() => navigate(`/import-songs/${choir.id}`)}>
+                    {/* Bouton désactivé si offline ou timeOut */}
+                    <button className="page-button" 
+                      disabled={showOfflineBanner || showTimeoutBanner} 
+                      style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                      onClick={() => navigate(`/import-songs/${choir.id}`)}
+                    >
                       <i className="fa fa-folder-open"></i> &nbsp; Importer des chants
                     </button>
                   </div>
@@ -683,19 +750,34 @@ export default function ChoirPage() {
           {isOwner ? (
             <>
               <div style={{ marginTop: '1.5rem' }}>
-                <button className="page-button" onClick={() => navigate(`/choir-delegation/${choir.id}`)}>
+                {/* Bouton désactivé si offline ou timeOut */}
+                <button className="page-button" 
+                  disabled={showOfflineBanner || showTimeoutBanner} 
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                  onClick={() => navigate(`/choir-delegation/${choir.id}`)}
+                >
                   <i className="fa fa-user-plus"></i> &nbsp; Donner délégation
                 </button>
               </div>
               <div style={{ marginTop: '1.5rem' }}>
-                <button className="page-button orange" onClick={() => navigate(`/delete-choir/${choir.id}`)}>
+                {/* Bouton désactivé si offline ou timeOut */}
+                <button className="page-button orange" 
+                  disabled={showOfflineBanner || showTimeoutBanner} 
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                  onClick={() => navigate(`/delete-choir/${choir.id}`)}
+                >
                   <i className="fa fa-users"></i> &nbsp; Supprimer la chorale
                 </button>
               </div>
             </>
           ) : isFullMember ? (
             <div style={{ marginTop: '1.5rem' }}>
-              <button className="page-button orange" onClick={() => navigate(`/leave-choir/${choir.id}`)}>
+              {/* Bouton désactivé si offline ou timeOut */}
+              <button className="page-button orange" 
+                disabled={showOfflineBanner || showTimeoutBanner} 
+                style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                onClick={() => navigate(`/leave-choir/${choir.id}`)}
+              >
                 <i className="fa fa-users"></i> &nbsp; Quitter la chorale
               </button>
             </div>
