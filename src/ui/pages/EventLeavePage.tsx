@@ -45,7 +45,7 @@ export default function LeaveEventPage() {
 
         // Vérifier si propriétaire
         const ownerId = await getChoirOwner(String(data.choir_id));
-        const isOwner = currentUser && ownerId === currentUser.id;
+        const isOwner = currentUser && Number(ownerId) === Number(currentUser.id);
 
         if (isOwner || isChoirMember) {
           // Pas un guest → rediriger vers la page de la chorale

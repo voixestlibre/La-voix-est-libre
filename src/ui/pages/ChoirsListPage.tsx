@@ -362,7 +362,7 @@ export default function MyChoirsPage() {
       } else {
         // Connecté
         const ownedIds = allLoadedChoirs
-          .filter((c: any) => c.owner_id === currentUser.id)
+          .filter((c: any) => Number(c.owner_id) === Number(currentUser.id))
           .map((c: any) => c.id);
         const param = await getUserParam(currentUser.email!).catch(() => null);
         if (ownedIds.length > 0 || (param && param.choirs_nb > 0)) profiles.push('owner');
@@ -420,7 +420,7 @@ export default function MyChoirsPage() {
               {/* Pas d'icône d'action pour les chorales fantômes :
                   l'utilisateur ne peut ni les supprimer ni les quitter */}
               {!c.ghost && (
-                user && c.owner_id === user.id ? (
+                user && Number(c.owner_id) === Number(user.id) ? (
                   // Propriétaire → icône suppression
                   <i
                     className="fa fa-trash trash"

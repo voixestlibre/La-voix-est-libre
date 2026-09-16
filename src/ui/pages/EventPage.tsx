@@ -295,13 +295,13 @@ export default function EventPage() {
 
         // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(String(eventData.choir_id));
-        const ownerCheck = currentUser && ownerId === currentUser.id;
+        const ownerCheck = currentUser && Number(ownerId) === Number(currentUser.id);
 
         // Si timeout déclenché
         if (cancelled.current) return;        
 
         if (ownerCheck) setIsOwner(true);
-        ownerCheckLocal = !!(currentUser && ownerId === currentUser.id);
+        ownerCheckLocal = !!(currentUser && Number(ownerId) === Number(currentUser.id));
 
         // Vérifier si l'utilisateur est le créateur de l'événement
         const userParamId = currentUser ? await getUserParamId(currentUser.email!) : null;

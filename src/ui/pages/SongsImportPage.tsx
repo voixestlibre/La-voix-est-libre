@@ -32,7 +32,7 @@ export default function ImportSongPage() {
       const currentUser = await getCurrentUser();
       if (!currentUser) { navigate('/'); return; }
       const ownerId = await getChoirOwner(choirId!);
-      if (ownerId !== currentUser.id) {
+      if (Number(ownerId) !== Number(currentUser.id)) {
         navigate(`/choir/${choirId}`, { replace: true });
       }
       setPageLoading(false);
@@ -174,7 +174,7 @@ export default function ImportSongPage() {
     const currentUser = await getCurrentUser();
     if (!currentUser) { navigate('/'); return; }
     const ownerId = await getChoirOwner(choirId!);
-    if (ownerId !== currentUser.id) { navigate('/'); return; }
+    if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
 
     // La vérification des droits est doublée (useEffect + handleDrop) pour
     // garantir la sécurité même si quelqu'un accède à la page et glisse

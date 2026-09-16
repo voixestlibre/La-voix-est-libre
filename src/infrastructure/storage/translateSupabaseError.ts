@@ -1,23 +1,10 @@
-// infrastructure/translateSupabaseError.ts
-// Ce fichier traduit les messages d'erreur Supabase en français lisible.
-// Le cas 'default' retourne le message original en anglais si aucune traduction
-// n'est disponible — utile pour les erreurs inattendues en développement.
-// Pour ajouter une traduction, copier le message exact retourné par Supabase
-// et ajouter un nouveau case.
-
+// src/infrastructure/storage/translateSupabaseError.ts
+// Conservé pour compatibilité — traduit les erreurs API en messages lisibles
 export function translateSupabaseError(message: string): string {
-    switch (message) {
-      case 'Password should be at least 6 characters.':
-        return 'Le mot de passe doit contenir au moins 6 caractères.';
-      case 'Invalid login credentials':
-        return 'Identifiants incorrects';
-      case 'User not found':
-        return "Utilisateur introuvable";
-      case 'User already registered':
-        return "Cet email est déjà utilisé.";
-      case 'Network error':
-        return "Erreur réseau, veuillez réessayer";
-      default:
-        return message;  
-    }
-  }
+  if (message.includes('Invalid login')) return 'Email ou mot de passe incorrect';
+  if (message.includes('Email not confirmed')) return 'Email non confirmé';
+  if (message.includes('Non connecté')) return 'Vous devez être connecté';
+  if (message.includes('Non autorisé')) return 'Action non autorisée';
+  if (message.includes('Email ou mot de passe incorrect')) return 'Email ou mot de passe incorrect';
+  return message || 'Une erreur est survenue';
+}

@@ -36,7 +36,7 @@ export default function EventDeletePage() {
 
         // Vérifier que l'utilisateur est propriétaire de la chorale ou créateur de l'évenement
         const ownerId = await getChoirOwner(String(eventData.choir_id));
-        const isOwner = ownerId === currentUser.id;
+        const isOwner = Number(ownerId) === Number(currentUser.id);
 
         // Construire les profils d'aide
         if (isOwner) setHelpProfiles(['owner']);

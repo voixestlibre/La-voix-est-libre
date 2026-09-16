@@ -66,7 +66,7 @@ export default function EventEditPage() {
           // Autoriser : propriétaire OU créateur de l'événement
           const ownerId = await getChoirOwner(String(data.choir_id));
           const userParamId = await getUserParamId(currentUser.email!);
-          const isOwner = ownerId === currentUser.id;
+          const isOwner = Number(ownerId) === Number(currentUser.id);
           const isCreator = userParamId !== null && data.created_by === userParamId;
 
           // Construire les profils d'aide
@@ -88,7 +88,7 @@ export default function EventEditPage() {
         }
       } else {
         const ownerId = await getChoirOwner(choirId!);
-        const isOwner = ownerId === currentUser.id;
+        const isOwner = Number(ownerId) === Number(currentUser.id);
         const isDelegate = delegations.includes(choirId!);
 
         // Construire les profils d'aide

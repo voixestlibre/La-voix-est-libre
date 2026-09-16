@@ -27,7 +27,7 @@ export default function DeleteChoirPage() {
       // Récupérer la chorale et vérifier qu'elle appartient à l'utilisateur
       try {
         const data = await getChoir(id!);
-        if (data.owner_id !== currentUser.id) { navigate('/'); return; }
+        if (Number(data.owner_id) !== Number(currentUser.id)) { navigate('/'); return; }
 
         // Interdire la suppression de la chorale 20393827
         if (String(data.code) === '20398727') {

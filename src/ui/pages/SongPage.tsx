@@ -236,7 +236,7 @@ export default function SongPage() {
         // Si timeout déclenché
         if (cancelled.current) return;
 
-        const ownerCheck = currentUser && ownerId === currentUser.id;
+        const ownerCheck = currentUser && Number(ownerId) === Number(currentUser.id);
         if (ownerCheck) setIsOwner(true);
         ownerCheckLocal = ownerCheck ?? false;
 

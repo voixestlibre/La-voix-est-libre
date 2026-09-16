@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
 import logo from '../../assets/logo.png';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import { getSongsByChoirIds } from '../../infrastructure/storage/songsService';
@@ -63,10 +62,10 @@ export default function HomePage() {
     
     // Vérifie si un utilisateur est connecté
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { getCurrentUser, getUserParam } = await import('../../infrastructure/storage/authService');
+      const currentUser = await getCurrentUser();
       // Timeout déclenché
       if (cancelled.current) return;
-      const currentUser = data.user || null;
       setUser(currentUser);
 
       // Afficher "Mes chorales" si :
@@ -114,7 +113,6 @@ export default function HomePage() {
       let canCreateChoir = false;
       if (currentUser) {
         try {
-          const { getUserParam } = await import('../../infrastructure/storage/authService');
           const param = await getUserParam(currentUser.email!);
           // Timeout déclenché
           if (cancelled.current) return;

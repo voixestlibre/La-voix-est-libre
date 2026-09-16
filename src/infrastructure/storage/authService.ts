@@ -1,248 +1,82 @@
-import { supabase } from './supabaseClient';
+// src/infrastructure/storage/authService.ts
+import { apiGet, apiPost } from './apiClient';
 
-export const MAGIC_SECRET = '122333444455555';
+export interface CurrentUser {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  choirs_nb: number;
+  choirs_delegations: string | null;
+}
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    return await apiGet<CurrentUser | null>('auth.php?action=me');
+  } catch { return null; }
+}
 
 export async function login(email: string, password: string) {
-  // -- Login classique --
-  if (password !== MAGIC_SECRET) {
-    const data = await signIn(email, password);
-    return { email: data.user?.email, isAdmin: false, message: 'Connexion réussie !', isNewUser: false };
-  }  
-
-  // -- Login via MAGIC_SECRET -- 
-  // MAGIC_SECRET est un mot de passe spécial réservé aux admins.
-  // Il permet d'activer le statut admin d'un utilisateur (nouveau ou existant)
-  // sans connaître son vrai mot de passe.
-  // Le compte est créé avec un mot de passe aléatoire (UUID) si l'utilisateur n'existe pas encore.
-  // ATTENTION : cette fonction ne connecte PAS l'utilisateur après activation admin —
-  // elle retourne isNewUser pour rediriger vers la réinitialisation du mot de passe.
-  const internalPassword = crypto.randomUUID();
-
-  let userExists = false;
-  const { data: existing } = await supabase
-    .from('users_param')
-    .select('email')
-    .eq('email', email)
-    .single();
-  userExists = !!existing;
-
-  if (!userExists) {
-    // Créer le compte Supabase
-    const { error } = await supabase.auth.signUp({ email, password: internalPassword });
-    if (error) throw error;
-    // Insérer l'email dans users_param après déconnexion
-    await supabase.auth.signOut();
-    await supabase.from('users_param').insert([{ email, is_admin: true, choirs_nb: 1 }]);
-  
-  } else {
-    // Mettre à jour is_admin à true
-    await supabase.from('users_param').update({ is_admin: true }).eq('email', email);
-  }
-  return { email, isAdmin: true, message: 'Administrateur activé !', isNewUser: !userExists };
+  const user = await apiPost<CurrentUser>('auth.php?action=login', { email, password });
+  return { email: user.email, isAdmin: user.is_admin, isNewUser: false, message: 'Connexion réussie' };
 }
 
-
-// Fonction pour se loguer
-export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data; 
+export async function signOut(): Promise<void> {
+  await apiPost('auth.php?action=logout');
 }
 
-
-// Fonction pour se déloguer
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+export async function getUserParam(email: string): Promise<CurrentUser | null> {
+  try {
+    return await apiGet<CurrentUser>(`users.php?action=by_email&email=${encodeURIComponent(email)}`);
+  } catch { return null; }
 }
-
-// Récupérer l'utilisateur connecté (null si non connecté)
-export async function getCurrentUser() {
-  const { data } = await supabase.auth.getUser();
-  return data.user;
-}
-
-// Récupérer le quota de chorales autorisées pour un utilisateur
-export async function getUserParam(email: string) {
-  const { data, error } = await supabase
-    .from('users_param')
-    .select('choirs_nb')
-    .eq('email', email)
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function requestPasswordReset(email: string) {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    // Utilise l'URL de base de l'environnement courant
-    redirectTo: `${window.location.origin}${import.meta.env.VITE_BASENAME ?? ''}/reset-password`,
-  });
-  if (error) throw error;
-}
-
-
-export async function setSessionFromHash(accessToken: string, refreshToken: string) {
-  const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-  if (error) throw error;
-}
-
-export async function resetPassword(password: string) {
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) throw error;
-}
-
-
-export async function createDelegateAccount(email: string, password: string, choirId: string) {
-  const { data: existing } = await supabase
-    .from('users_param')
-    .select('email, choirs_delegations')
-    .eq('email', email)
-    .single();
-
-  if (existing) {
-    const current = existing.choirs_delegations
-      ? existing.choirs_delegations.split(';').map((s: string) => s.trim())
-      : [];
-    if (!current.includes(String(choirId))) {
-      const updated = [...current, String(choirId)].join(';');
-      await supabase.from('users_param').update({ choirs_delegations: updated }).eq('email', email);
-    }
-    return { isNewUser: false };
-  } else {
-    // Sauvegarder la session courante (email1)
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
-
-    // Créer le compte email2
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-
-    // Insérer dans users_param
-    await supabase.from('users_param').insert([{
-      email,
-      is_admin: false,
-      choirs_nb: 0,
-      choirs_delegations: String(choirId),
-    }]);
-
-    // Restaurer la session email1
-    // Supabase connecte automatiquement le nouvel utilisateur lors du signUp.
-    // Il faut donc restaurer la session de l'admin après la création du compte délégué,
-    // sinon l'admin se retrouverait connecté en tant que délégué.    
-    if (currentSession) {
-      await supabase.auth.setSession({
-        access_token: currentSession.access_token,
-        refresh_token: currentSession.refresh_token,
-      });
-    }
-
-    return { isNewUser: true };
-  }
-}
-
-
-// Les délégations sont stockées sous forme de chaîne CSV de choir_ids dans users_param.choirs_delegations.
-// Ex: "12;34;56" signifie que l'utilisateur a délégation sur les chorales 12, 34 et 56.
-export async function getUserDelegations(email: string): Promise<string[]> {
-  const { data } = await supabase
-    .from('users_param')
-    .select('choirs_delegations')
-    .eq('email', email)
-    .single();
-  if (!data?.choirs_delegations) return [];
-  return data.choirs_delegations.split(';').map((s: string) => s.trim());
-}
-
 
 export async function getUserParamId(email: string): Promise<number | null> {
-  const { data, error } = await supabase
-    .from('users_param')
-    .select('id')
-    .eq('email', email)
-    .single();
-  if (error) return null;
-  return data.id;
+  try {
+    const res = await apiGet<{ id: number }>(`users.php?action=param_id&email=${encodeURIComponent(email)}`);
+    return res.id;
+  } catch { return null; }
 }
 
+export async function getUserDelegations(email: string): Promise<string[]> {
+  try {
+    return await apiGet<string[]>(`users.php?action=delegations&email=${encodeURIComponent(email)}`);
+  } catch { return []; }
+}
+
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  try {
+    const res = await apiGet<{ is_admin: boolean }>('users.php?action=is_admin');
+    return res.is_admin;
+  } catch { return false; }
+}
+
+export async function createUserAccount(email: string, password: string): Promise<void> {
+  await apiPost('users.php?action=create', { email, password, choirs_nb: 1 });
+}
+
+export async function createDelegateAccount(email: string, password: string, choirId: string) {
+  return apiPost<any>('users.php?action=create_delegate', { email, password, choir_id: choirId });
+}
 
 export async function getChoirDelegates(choirId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('users_param')
-    .select('email, choirs_delegations')
-    .not('choirs_delegations', 'is', null);
-  if (error) throw error;
-  return (data || [])
-    .filter((row) => row.choirs_delegations?.split(';').includes(choirId))
-    .map((row) => row.email);
+  try {
+    return await apiGet<string[]>(`users.php?action=choir_delegates&choir_id=${choirId}`);
+  } catch { return []; }
 }
 
-
-// Révoquer la délégation d'un utilisateur pour une chorale
 export async function revokeDelegation(email: string, choirId: string): Promise<void> {
-  // Récupérer les délégations actuelles de l'utilisateur
-  const { data, error } = await supabase
-    .from('users_param')
-    .select('id, choirs_delegations')
-    .eq('email', email.toLowerCase())
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Utilisateur introuvable');
-
-  // Retirer choirId de la liste CSV
-  const ids = (data.choirs_delegations ?? '')
-    .split(';')
-    .map((s: string) => s.trim())
-    .filter((s: string) => s !== '' && s !== String(choirId));
-
-  const { error: updateError } = await supabase
-    .from('users_param')
-    .update({ choirs_delegations: ids.length > 0 ? ids.join(';') : null })
-    .eq('id', data.id);
-  if (updateError) throw updateError;
+  await apiPost('users.php?action=revoke_delegation', { email, choir_id: choirId });
 }
 
-
-// Vérifier si l'utilisateur connecté est administrateur
-export async function isCurrentUserAdmin(): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.email) return false;
-  const { data } = await supabase
-    .from('users_param')
-    .select('is_admin')
-    .eq('email', user.email.toLowerCase())
-    .maybeSingle();
-  return data?.is_admin === true;
+// Fonctions reset mot de passe — adaptées sans Supabase
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiPost('auth.php?action=request_reset', { email });
 }
 
-// Créer un nouvel utilisateur standard (depuis un compte admin)
-// Conserve la session de l'admin après la création
-// Supabase connecte automatiquement le nouvel utilisateur lors du signUp.
-// Il faut donc restaurer la session de l'admin après la création du compte,
-// sinon l'admin se retrouverait connecté en tant que nouvel utilisateur.
-export async function createUserAccount(email: string, password: string): Promise<void> {
-  // Sauvegarder la session admin avant la création
-  const { data: { session: adminSession } } = await supabase.auth.getSession();
+export async function setSessionFromHash(_accessToken: string, _refreshToken: string): Promise<void> {
+  // Non applicable sans Supabase — géré via session PHP
+}
 
-  // Créer le compte via signUp — cela connecte automatiquement le nouvel utilisateur
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
-  if (!data.user) throw new Error('Création du compte échouée');
-
-  // Créer l'entrée dans users_param avec les paramètres par défaut
-  const { error: paramError } = await supabase
-    .from('users_param')
-    .insert([{
-      email: email.toLowerCase(),
-      is_admin: false,
-      choirs_nb: 1,
-    }]);
-  if (paramError) throw paramError;
-
-  // Restaurer la session admin
-  if (adminSession) {
-    await supabase.auth.setSession({
-      access_token: adminSession.access_token,
-      refresh_token: adminSession.refresh_token,
-    });
-  }
+export async function resetPassword(password: string): Promise<void> {
+  await apiPost('auth.php?action=reset_password', { password });
 }

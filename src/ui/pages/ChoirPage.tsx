@@ -121,7 +121,7 @@ export default function ChoirPage() {
         if (cancelled.current) return;
 
         // Vérifier si l'utilisateur connecté est le propriétaire
-        const ownerCheck = currentUser && data.owner_id === currentUser.id;
+        const ownerCheck = currentUser && Number(data.owner_id) === Number(currentUser.id);
         ownerCheckLocal = !!ownerCheck;
         setIsOwner(!!ownerCheck);
         if (ownerCheck) setActiveTab('songs');

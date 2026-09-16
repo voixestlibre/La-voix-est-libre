@@ -24,7 +24,7 @@ export default function ChoirDelegationPage() {
       if (!currentUser) { navigate('/'); return; }
 
       const ownerId = await getChoirOwner(choirId!);
-      if (ownerId !== currentUser.id) { navigate('/'); return; }
+      if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
 
       const list = await getChoirDelegates(choirId!);
       setDelegates(list);

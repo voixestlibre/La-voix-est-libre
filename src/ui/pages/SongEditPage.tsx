@@ -55,7 +55,7 @@ export default function SongEditPage() {
 
           // Vérifier que l'utilisateur est bien propriétaire de la chorale
           const ownerId = await getChoirOwner(data.choir_id);
-          if (ownerId !== currentUser.id) { navigate('/'); return; }
+          if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
 
           // Charger tous les hashtags connus de la chorale pour l'autocomplétion
           const known = await getChoirHashtags(data.choir_id);
@@ -68,7 +68,7 @@ export default function SongEditPage() {
       } else {
         // Mode création : vérifier que l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(choirId!);
-        if (ownerId !== currentUser.id) { navigate('/'); return; }
+        if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
         setResolvedChoirId(choirId!);
 
         // Charger tous les hashtags connus de la chorale pour l'autocomplétion
