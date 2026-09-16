@@ -109,16 +109,10 @@ export async function fileExists(songId: string, fileName: string): Promise<bool
     const files = await apiGet<{ name: string; url: string }[]>(
       `upload.php?action=list&song_id=${songId}`
     );
-    // Vérifier dans les fichiers uploadés
-    if (files.some(f => f.name === fileName)) return true;
-  } catch {}
-  // Vérifier aussi dans les fichiers externes si code présent
-  const code = fileName.split('.')[0].replace(/-[A-Z0-9]+$/, '');
-  const url = `${EXTERNAL_SONG_BASE_URL}${code}/${fileName}`;
-  try {
-    const res = await fetch(url, { method: 'HEAD' });
-    return res.ok;
-  } catch { return false; }
+    return files.some(f => f.name === fileName);
+  } catch {
+    return false;
+  }
 }
 
 export async function uploadSongFile(songId: string, fileName: string, file: File): Promise<void> {

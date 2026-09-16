@@ -23,7 +23,17 @@ export default defineConfig({
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
         ]
-      }
+      },
+      // Exclure le dossier api/ et les dossiers de fichiers
+      // du service worker pour qu'ils soient traités directement par le serveur PHP
+      workbox: {
+        navigateFallback: '/lavoixestlibre/index.html',
+        navigateFallbackDenylist: [
+          /^\/lavoixestlibre\/api\//,
+          /^\/lavoixestlibre\/fichiersUtilisateurs\//,
+          /^\/lavoixestlibre\/fichiersWebApp\//,
+        ],
+      },
     })
   ]
 });
