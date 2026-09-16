@@ -60,35 +60,59 @@ export function getSongFileUrl(_songId: string, fileName: string): string {
 }
 
 export async function getSongFiles(
-  _songId: string,
+  songId: string,
   songTitle?: string,
   songCode?: string
 ): Promise<{ name: string; url: string; source: string }[]> {
-  if (!songCode || !songTitle) return [];
-  const toCheck = [
-    { name: `${songTitle}.pdf`, urlSuffix: `${songCode}.pdf` },
-    { name: `${songTitle}.mp3`, urlSuffix: `${songCode}.mp3` },
-    { name: `${songTitle} - Instruments.mp3`, urlSuffix: `${songCode}-2.mp3` },
-    { name: `${songTitle} - Alto.mp3`, urlSuffix: `${songCode}-A.mp3` },
-    { name: `${songTitle} - Alto 2.mp3`, urlSuffix: `${songCode}-A2.mp3` },
-    { name: `${songTitle} - Basse.mp3`, urlSuffix: `${songCode}-B.mp3` },
-    { name: `${songTitle} - Basse 2.mp3`, urlSuffix: `${songCode}-B2.mp3` },
-    { name: `${songTitle} - Soprano.mp3`, urlSuffix: `${songCode}-S.mp3` },
-    { name: `${songTitle} - Tenor.mp3`, urlSuffix: `${songCode}-T.mp3` },
-    { name: `${songTitle} - Tenor 2.mp3`, urlSuffix: `${songCode}-T2.mp3` },
-  ];
   const files: { name: string; url: string; source: string }[] = [];
-  for (const f of toCheck) {
-    const url = `${EXTERNAL_SONG_BASE_URL}${songCode}/${f.urlSuffix}`;
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      if (res.ok) files.push({ name: f.name, url, source: 'external' });
-    } catch {}
+
+  // Source 1 : fichiers uploadés par les utilisateurs
+  try {
+    const uploaded = await apiGet<{ name: string; url: string }[]>(
+      `upload.php?action=list&song_id=${songId}`
+    );
+    for (const f of uploaded) {
+      files.push({ name: f.name, url: f.url, source: 'uploaded' });
+    }
+  } catch {}
+
+  // Source 2 : fichiers proposés sur larminat.fr (si code défini)
+  if (songCode && songTitle) {
+    const toCheck = [
+      { name: `${songTitle}.pdf`, urlSuffix: `${songCode}.pdf` },
+      { name: `${songTitle}.mp3`, urlSuffix: `${songCode}.mp3` },
+      { name: `${songTitle} - Instruments.mp3`, urlSuffix: `${songCode}-2.mp3` },
+      { name: `${songTitle} - Alto.mp3`, urlSuffix: `${songCode}-A.mp3` },
+      { name: `${songTitle} - Alto 2.mp3`, urlSuffix: `${songCode}-A2.mp3` },
+      { name: `${songTitle} - Basse.mp3`, urlSuffix: `${songCode}-B.mp3` },
+      { name: `${songTitle} - Basse 2.mp3`, urlSuffix: `${songCode}-B2.mp3` },
+      { name: `${songTitle} - Soprano.mp3`, urlSuffix: `${songCode}-S.mp3` },
+      { name: `${songTitle} - Tenor.mp3`, urlSuffix: `${songCode}-T.mp3` },
+      { name: `${songTitle} - Tenor 2.mp3`, urlSuffix: `${songCode}-T2.mp3` },
+    ];
+    for (const f of toCheck) {
+      const url = `${EXTERNAL_SONG_BASE_URL}${songCode}/${f.urlSuffix}`;
+      // Ne pas ajouter si déjà présent dans les fichiers uploadés
+      if (files.some(existing => existing.name === f.name)) continue;
+      try {
+        const res = await fetch(url, { method: 'HEAD' });
+        if (res.ok) files.push({ name: f.name, url, source: 'external' });
+      } catch {}
+    }
   }
+
   return files;
 }
 
-export async function fileExists(_songId: string, fileName: string): Promise<boolean> {
+export async function fileExists(songId: string, fileName: string): Promise<boolean> {
+  try {
+    const files = await apiGet<{ name: string; url: string }[]>(
+      `upload.php?action=list&song_id=${songId}`
+    );
+    // Vérifier dans les fichiers uploadés
+    if (files.some(f => f.name === fileName)) return true;
+  } catch {}
+  // Vérifier aussi dans les fichiers externes si code présent
   const code = fileName.split('.')[0].replace(/-[A-Z0-9]+$/, '');
   const url = `${EXTERNAL_SONG_BASE_URL}${code}/${fileName}`;
   try {
@@ -97,10 +121,22 @@ export async function fileExists(_songId: string, fileName: string): Promise<boo
   } catch { return false; }
 }
 
-export async function uploadSongFile(_songId: string, _fileName: string, _file: File): Promise<void> {
-  throw new Error('Upload non disponible — déposez les fichiers par FTP sur larminat.fr/petitchoeur/');
+export async function uploadSongFile(songId: string, fileName: string, file: File): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file, fileName);
+
+  const url = `${import.meta.env.BASE_URL}api/upload.php?action=upload&song_id=${songId}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error ?? 'Erreur upload');
 }
 
-export async function deleteSongFile(_songId: string, _fileName: string): Promise<void> {
-  throw new Error('Suppression non disponible — supprimez les fichiers par FTP');
+export async function deleteSongFile(songId: string, fileName: string): Promise<void> {
+  await apiDelete(
+    `upload.php?action=delete&song_id=${songId}&file_name=${encodeURIComponent(fileName)}`
+  );
 }
