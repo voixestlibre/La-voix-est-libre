@@ -1,7 +1,7 @@
 // src/infrastructure/storage/songsService.ts
 import { apiGet, apiPost, apiPut, apiDelete } from './apiClient';
 
-export const EXTERNAL_SONG_BASE_URL = 'https://www.larminat.fr/petitchoeur/';
+export const EXTERNAL_SONG_BASE_URL = 'https://www.larminat.fr/lavoixestlibre/fichiersWebApp/';
 
 export async function getSong(id: string) {
   return apiGet<any>(`songs.php?action=by_id&id=${id}`);
@@ -66,7 +66,7 @@ export async function getSongFiles(
 ): Promise<{ name: string; url: string; source: string }[]> {
   if (!songCode || !songTitle) return [];
   const toCheck = [
-    { name: `${songCode}.pdf`, urlSuffix: `${songCode}.pdf` },
+    { name: `${songTitle}.pdf`, urlSuffix: `${songCode}.pdf` },
     { name: `${songTitle}.mp3`, urlSuffix: `${songCode}.mp3` },
     { name: `${songTitle} - Instruments.mp3`, urlSuffix: `${songCode}-2.mp3` },
     { name: `${songTitle} - Alto.mp3`, urlSuffix: `${songCode}-A.mp3` },

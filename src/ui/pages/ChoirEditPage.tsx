@@ -125,7 +125,7 @@ export default function ChoirEditPage() {
 
               {isAdmin && isEditing && (
                 <div style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <span style={{ fontSize: '0.9rem', color: '#555' }}>Fichiers larminat.fr :</span>
+                  <span style={{ fontSize: '0.9rem' }}>Accès aux fichiers larminat.fr :</span>
                   <button
                     type="button"
                     className={usesExternalFiles ? 'page-button' : 'page-button2'}
@@ -135,7 +135,7 @@ export default function ChoirEditPage() {
                       setUsesExternalFiles(!usesExternalFiles);
                     }}
                   >
-                    {usesExternalFiles ? 'Activés' : 'Désactivés'}
+                    {usesExternalFiles ? 'Autorisé' : 'Non autorisé'}
                   </button>
                 </div>
               )}

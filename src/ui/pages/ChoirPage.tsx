@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'; 
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserDelegations, getUserParamId, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getChoir } from '../../infrastructure/storage/choirsService';
 import { getChoirSongs, toggleFavoriteSong, toggleCommonSong } from '../../infrastructure/storage/songsService';
 import { getChoirEvents, toggleEventActive } from '../../infrastructure/storage/eventsService';
@@ -15,6 +15,7 @@ export default function ChoirPage() {
   const navigate = useNavigate();
   const [choir, setChoir] = useState<any>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   // Vrai si l'utilisateur a rejoint la chorale explicitement (via son code)
   // Faux si l'utilisateur n'a accès qu'à certains événements (chorale "fantôme")
   const [isFullMember, setIsFullMember] = useState(false);
@@ -68,6 +69,11 @@ export default function ChoirPage() {
     const fetchChoir = async () => {
       // Récupérer l'utilisateur connecté (peut être null)
       const currentUser = await getCurrentUser();
+
+      // Identifier si l'utilisateur a le rôle d'admin
+      const admin = await isCurrentUserAdmin();
+      if (cancelled.current) return;
+      setIsAdmin(admin);      
 
       // Si timeout déclenché
       if (cancelled.current) return;
@@ -330,6 +336,18 @@ export default function ChoirPage() {
           {isFullMember && choir.code && (
             <p><strong>Code :</strong> {formatCode(String(choir.code))}</p>
           )}
+
+          {/* Abonnement aux fichiers déposés sur larminat.fr */}
+          {isAdmin && (
+            <p><strong>
+              Accès aux fichiers larminat.fr :&nbsp;</strong>
+              {choir.uses_external_files ? (
+                <span style={{ color: 'green' }}>autorisé</span>
+              ) : (
+                <span style={{ color: '#c00' }}>non autorisé</span>
+              )}
+            </p>
+          )}          
 
           {/* Onglets : l'onglet Chants n'est visible que pour le propriétaire et pour les utilisateurs ayant reçu délégation */}
           <div style={{ display: 'flex', marginBottom: '1.5rem', borderBottom: '3px solid #ddd' }}>
