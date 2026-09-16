@@ -106,7 +106,7 @@ export default function HomePage() {
         });
         setAllSongs(accessibleSongs);
         setLoading(false);
-        return; // Sortir sans appels Supabase
+        return; // Sortir sans appels bdd MySQL
       }      
       
       // Réseau disponible
@@ -133,7 +133,7 @@ export default function HomePage() {
 
       // Charger les chants accessibles pour la recherche
       // La recherche est construite depuis deux sources :
-      // 1. Chants des chorales propriétaires (tous les chants, via Supabase)
+      // 1. Chants des chorales propriétaires (tous les chants, via bdd MySQL)
       // 2. Chants des événements rejoints (uniquement les chants listés dans storedEvents[].songs)
       // Les chants des événements inactifs sont exclus de la recherche.
       // La recherche est désactivée en mode offline (le try/catch absorbe l'erreur).      

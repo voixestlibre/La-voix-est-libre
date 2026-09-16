@@ -2,7 +2,7 @@
 // Ce service gère le cache offline des fichiers de partitions via la Cache API du navigateur.
 // Chaque événement mémorisé a son propre cache nommé "event-files-{eventId}".
 // Un seul événement peut être mis en cache à la fois (contrainte applicative, pas technique).
-// Les URLs stockées dans le cache sont les URLs publiques Supabase ou externes —
+// Les URLs stockées dans le cache sont les URLs publiques externes (larminat.fr/) -
 // elles servent de clés de recherche dans le cache.
 
 const CACHE_PREFIX = 'event-files-';

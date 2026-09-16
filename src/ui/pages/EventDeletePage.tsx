@@ -52,7 +52,7 @@ export default function EventDeletePage() {
 
         setPageLoading(false);
       } catch {
-        // Supabase inaccessible ou événement introuvable → déjà supprimé
+        // bdd MySQL inaccessible ou événement introuvable → déjà supprimé
         navigate('/my-choirs', { replace: true });
       }
     };

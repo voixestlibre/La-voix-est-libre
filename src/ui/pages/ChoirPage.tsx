@@ -110,10 +110,10 @@ export default function ChoirPage() {
 
       // Stratégie d'accès à deux niveaux :
       // 1. Vérification rapide depuis le localStorage (offline-first) pour déterminer les droits de base
-      // 2. Vérification Supabase pour obtenir les données à jour et confirmer le propriétaire
-      // En cas d'échec Supabase, les données localStorage servent de fallback
+      // 2. Vérification bdd MySQL pour obtenir les données à jour et confirmer le propriétaire
+      // En cas d'échec bdd MySQL, les données localStorage servent de fallback
       try {
-        // Récupérer la chorale depuis Supabase
+        // Récupérer la chorale depuis bdd MySQL
         const data = await getChoir(id!);
         setChoir(data);
 
@@ -164,7 +164,7 @@ export default function ChoirPage() {
         if (!cancelled.current) setShowOfflineBanner(true);
 
         // ── Fallback offline ─────────────────────────────────────────────
-        // Supabase inaccessible : on reconstruit ce qu'on peut depuis le localStorage
+        // bdd MySQL inaccessible : on reconstruit ce qu'on peut depuis le localStorage
 
         // Vérifier les droits d'accès offline
         if (!isInJoinedChoirs && !hasDirectEvent) {

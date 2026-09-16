@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, login, signOut } from '../../infrastructure/storage/authService';
-import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -82,13 +81,13 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      setMessage(translateSupabaseError(err.message));
+      setMessage(err.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
   };
 
-  // La déconnexion via signOut() invalide la session Supabase côté client.
+  // La déconnexion via signOut() invalide la session côté client.
   // Le localStorage (chorales, événements) n'est PAS effacé lors de la déconnexion
   // pour permettre un accès offline aux données préalablement mémorisées.  
   const handleLogout = async () => {

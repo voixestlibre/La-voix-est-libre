@@ -29,11 +29,11 @@ export default function LeaveEventPage() {
 
       // Stratégie de vérification en deux étapes :
       // 1. Vérification rapide depuis le localStorage (accès offline) : l'événement doit y être présent
-      // 2. Vérification Supabase : s'assurer que l'utilisateur est bien un "guest"
+      // 2. Vérification bdd MySQL : s'assurer que l'utilisateur est bien un "guest"
       //    (a rejoint l'événement directement, et n'est ni membre de la chorale ni propriétaire)
-      // Si Supabase est inaccessible, la vérification offline sur joined_choirs suffit.      
+      // Si bdd MySQL est inaccessible, la vérification offline sur joined_choirs suffit.      
       try {
-        // Récupérer l'événement depuis Supabase
+        // Récupérer l'événement depuis bdd MySQL
         const data = await getEvent(eventId!);
         setEventName(data.name);
         setChoirId(String(data.choir_id));

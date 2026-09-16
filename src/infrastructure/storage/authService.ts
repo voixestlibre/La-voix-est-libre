@@ -67,16 +67,3 @@ export async function getChoirDelegates(choirId: string): Promise<string[]> {
 export async function revokeDelegation(email: string, choirId: string): Promise<void> {
   await apiPost('users.php?action=revoke_delegation', { email, choir_id: choirId });
 }
-
-// Fonctions reset mot de passe — adaptées sans Supabase
-export async function requestPasswordReset(email: string): Promise<void> {
-  await apiPost('auth.php?action=request_reset', { email });
-}
-
-export async function setSessionFromHash(_accessToken: string, _refreshToken: string): Promise<void> {
-  // Non applicable sans Supabase — géré via session PHP
-}
-
-export async function resetPassword(password: string): Promise<void> {
-  await apiPost('auth.php?action=reset_password', { password });
-}

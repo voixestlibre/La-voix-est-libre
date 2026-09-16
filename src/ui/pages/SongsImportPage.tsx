@@ -105,7 +105,6 @@ export default function ImportSongPage() {
   
     // Les noms de fichiers sont normalisés avant upload : accents supprimés,
     // ligatures (œ, æ) remplacées, virgules et points-virgules supprimés
-    // pour éviter des problèmes d'URL dans le bucket Supabase
     for (const fileEntry of entries) {
       if (!fileEntry.isFile) continue;
       const file = await readFile(fileEntry as FileSystemFileEntry);
