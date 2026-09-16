@@ -54,12 +54,13 @@ export async function getSongByTitle(choirId: string, title: string) {
   } catch { return null; }
 }
 
-export function getSongFileUrl(songId: string, fileName: string): string {
-  return `${EXTERNAL_SONG_BASE_URL}${songId}/${fileName}`;
+export function getSongFileUrl(_songId: string, fileName: string): string {
+  const code = fileName.split('.')[0].replace(/-[A-Z0-9]+$/, '');
+  return `${EXTERNAL_SONG_BASE_URL}${code}/${fileName}`;
 }
 
 export async function getSongFiles(
-  songId: string,
+  _songId: string,
   songTitle?: string,
   songCode?: string
 ): Promise<{ name: string; url: string; source: string }[]> {
@@ -78,7 +79,7 @@ export async function getSongFiles(
   ];
   const files: { name: string; url: string; source: string }[] = [];
   for (const f of toCheck) {
-    const url = `${EXTERNAL_SONG_BASE_URL}${songId}/${f.urlSuffix}`;
+    const url = `${EXTERNAL_SONG_BASE_URL}${songCode}/${f.urlSuffix}`;
     try {
       const res = await fetch(url, { method: 'HEAD' });
       if (res.ok) files.push({ name: f.name, url, source: 'external' });
@@ -87,8 +88,9 @@ export async function getSongFiles(
   return files;
 }
 
-export async function fileExists(songId: string, fileName: string): Promise<boolean> {
-  const url = `${EXTERNAL_SONG_BASE_URL}${songId}/${fileName}`;
+export async function fileExists(_songId: string, fileName: string): Promise<boolean> {
+  const code = fileName.split('.')[0].replace(/-[A-Z0-9]+$/, '');
+  const url = `${EXTERNAL_SONG_BASE_URL}${code}/${fileName}`;
   try {
     const res = await fetch(url, { method: 'HEAD' });
     return res.ok;

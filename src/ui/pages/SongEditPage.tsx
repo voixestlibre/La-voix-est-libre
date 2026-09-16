@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
-import { getChoirOwner } from '../../infrastructure/storage/choirsService';
+import { getChoirOwner, getChoir } from '../../infrastructure/storage/choirsService';
 import {
   getSong,
   createSong,
@@ -32,6 +32,7 @@ export default function SongEditPage() {
   const [resolvedChoirId, setResolvedChoirId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [usesExternalFiles, setUsesExternalFiles] = useState(false)
 
   // URL de retour : page du chant en mode édition, page de la chorale en mode création
   const backUrl = isEditing ? `/song/${songId}` : `/choir/${resolvedChoirId}`;
@@ -57,6 +58,9 @@ export default function SongEditPage() {
           const ownerId = await getChoirOwner(data.choir_id);
           if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
 
+          const choirData = await getChoir(data.choir_id);
+          setUsesExternalFiles(!!choirData.uses_external_files);
+
           // Charger tous les hashtags connus de la chorale pour l'autocomplétion
           const known = await getChoirHashtags(data.choir_id);
           setAllHashtags(known);
@@ -70,6 +74,9 @@ export default function SongEditPage() {
         const ownerId = await getChoirOwner(choirId!);
         if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
         setResolvedChoirId(choirId!);
+
+        const choirData = await getChoir(choirId!);
+        setUsesExternalFiles(!!choirData.uses_external_files);
 
         // Charger tous les hashtags connus de la chorale pour l'autocomplétion
         const known = await getChoirHashtags(choirId!);
@@ -177,7 +184,7 @@ export default function SongEditPage() {
           />
 
           {/* Code du chant (facultatif) — uniquement pour la chorale 32 */}
-          {String(resolvedChoirId) === '32' && (
+          {usesExternalFiles && (
             <input
               type="text"
               placeholder="Code (facultatif)"
