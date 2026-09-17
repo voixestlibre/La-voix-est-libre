@@ -82,9 +82,9 @@ export default function ImportSongPage() {
     if (existingSong) {
       if (!existingSong.code && songCode) {
         // Mettre à jour le code
-        const hashtags = existingSong.hashtags
-          ? existingSong.hashtags.split(',').filter(Boolean)
-          : [];
+        const hashtags = Array.isArray(existingSong.hashtags)
+          ? existingSong.hashtags
+          : (existingSong.hashtags ? existingSong.hashtags.split(',').filter(Boolean) : []);
         await updateSong(existingSong.id, existingSong.title, hashtags, songCode);
         report.errors.push(`Chant existant — Code "${songCode}" associé.`);
       } else if (existingSong.code && existingSong.code !== songCode) {
