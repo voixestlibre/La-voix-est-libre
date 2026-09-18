@@ -1,9 +1,8 @@
 // src/ui/components/TopBar.tsx 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
+import { getCurrentUser, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
-import { isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import HelpPopover from './HelpPopover';
 import { type UserProfile } from './helpData';
 import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
@@ -71,8 +70,8 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
   // Note : la condition !!currentUser est volontairement conservée ici pour le menu TopBar
   // (différent de HomePage qui vérifie le quota)
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const currentUser = data.session?.user ?? null;
+    const init = async () => {
+      const currentUser = await getCurrentUser();
       setUser(currentUser);
       const hasStoredChoirs = getStoredChoirs().length > 0;
       const hasStoredEvents = getStoredEvents().length > 0;
@@ -100,14 +99,14 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
         getStoredEvents().forEach((e) => {
           if (e.active === false) return;
           e.songs?.forEach((s: any) => {
-            if (!accessibleSongs.some((a) => a.id === s.id)) {
+            if (!accessibleSongs.some((a) => a.id === s.id))
               accessibleSongs.push({ id: s.id, title: s.title, hashtags: [] });
-            }
           });
         });
         setAllSongs(accessibleSongs);
       } catch {}
-    });
+    };
+    init();
   }, []);
 
   // useEffect pour détecter les clics à l'extérieur du champ de recherche

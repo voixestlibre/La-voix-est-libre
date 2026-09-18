@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../infrastructure/storage/supabaseClient';
 import logo from '../../assets/logo.png';
 import { getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
 import { getSongsByChoirIds } from '../../infrastructure/storage/songsService';
@@ -28,9 +27,31 @@ export default function HomePage() {
 
   // Gestion du logo (offline / online)
   useEffect(() => {
+    // Au montage : utiliser le logo en cache si disponible
+    const cached = localStorage.getItem('app_logo_b64');
+    if (cached) {
+      setLogoSrc(cached);
+      return;
+    }
+    // Sinon : essayer de charger le logo bundle et le mettre en cache
+    fetch(logo)
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const b64 = reader.result as string;
+          localStorage.setItem('app_logo_b64', b64);
+          setLogoSrc(b64);
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {
+        // Offline et pas de cache — le logo bundle s'affiche via l'import Vite
+      });
+    // Écouter l'événement offline pour basculer si connexion perdue pendant la session
     const handleOffline = () => {
-      const cached = localStorage.getItem('app_logo_b64');
-      if (cached) setLogoSrc(cached);
+      const freshCached = localStorage.getItem('app_logo_b64');
+      if (freshCached) setLogoSrc(freshCached);
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
@@ -63,10 +84,10 @@ export default function HomePage() {
     
     // Vérifie si un utilisateur est connecté
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { getCurrentUser, getUserParam } = await import('../../infrastructure/storage/authService');
+      const currentUser = await getCurrentUser();
       // Timeout déclenché
       if (cancelled.current) return;
-      const currentUser = data.user || null;
       setUser(currentUser);
 
       // Afficher "Mes chorales" si :
@@ -107,14 +128,13 @@ export default function HomePage() {
         });
         setAllSongs(accessibleSongs);
         setLoading(false);
-        return; // Sortir sans appels Supabase
+        return; // Sortir sans appels bdd MySQL
       }      
       
       // Réseau disponible
       let canCreateChoir = false;
       if (currentUser) {
         try {
-          const { getUserParam } = await import('../../infrastructure/storage/authService');
           const param = await getUserParam(currentUser.email!);
           // Timeout déclenché
           if (cancelled.current) return;
@@ -135,7 +155,7 @@ export default function HomePage() {
 
       // Charger les chants accessibles pour la recherche
       // La recherche est construite depuis deux sources :
-      // 1. Chants des chorales propriétaires (tous les chants, via Supabase)
+      // 1. Chants des chorales propriétaires (tous les chants, via bdd MySQL)
       // 2. Chants des événements rejoints (uniquement les chants listés dans storedEvents[].songs)
       // Les chants des événements inactifs sont exclus de la recherche.
       // La recherche est désactivée en mode offline (le try/catch absorbe l'erreur).      

@@ -140,7 +140,7 @@ export default function MyEventsPage() {
             name: ev.name,
             choir_id: ev.choir_id,
             choir_name: ev.choir_name,
-            // Charger les chants depuis Supabase, fallback sur le localStorage si erreur
+            // Charger les chants depuis bdd MySQL, fallback sur le localStorage si erreur
             songs: await getEventSongsTitles(String(ev.id)).catch(() => existing?.songs ?? []),
             is_cached: existing?.is_cached ?? false,
             cached_files: existing?.cached_files ?? [],
@@ -328,7 +328,7 @@ export default function MyEventsPage() {
         for (const f of files) {
           if (isCacheable(f.name)) {
             allFiles.push({ name: f.name, url: f.url, songId, songTitle });
-            // ↑ utiliser f.url directement (contient déjà l'URL externe ou Supabase)
+            // ↑ utiliser f.url directement (contient déjà l'URL externe ou bdd MySQL)
           }
         }
       }

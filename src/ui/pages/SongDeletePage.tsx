@@ -28,7 +28,7 @@ export default function DeleteSongPage() {
         // Vérification que l'utilisateur a le droit d'effacer
         const { getChoirOwner } = await import('../../infrastructure/storage/choirsService');
         const ownerId = await getChoirOwner(data.choir_id);
-        if (ownerId !== currentUser.id) {
+        if (Number(ownerId) !== Number(currentUser.id)) {
           navigate(`/choir/${data.choir_id}`, { replace: true });
           return;
         }

@@ -236,7 +236,7 @@ export default function SongPage() {
         // Si timeout déclenché
         if (cancelled.current) return;
 
-        const ownerCheck = currentUser && ownerId === currentUser.id;
+        const ownerCheck = currentUser && Number(ownerId) === Number(currentUser.id);
         if (ownerCheck) setIsOwner(true);
         ownerCheckLocal = ownerCheck ?? false;
 
@@ -293,7 +293,7 @@ export default function SongPage() {
         }
       } catch {
         // ── Fallback offline ──────────────────────────────────────────
-        // Supabase inaccessible : reconstituer depuis le localStorage et le cache
+        // bdd MySQL inaccessible : reconstituer depuis le localStorage et le cache
 
         // Déclenchement de la bannière Offline
         if (!cancelled.current) setShowOfflineBanner(true);

@@ -1,234 +1,73 @@
-import { supabase } from './supabaseClient';
-import { generateUniqueCode } from './choirsService';
+// src/infrastructure/storage/eventsService.ts
+import { apiGet, apiPost, apiPut, apiDelete } from './apiClient';
 
-// Récupérer un événement par son id
-export async function getEvent(eventId: string) {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', parseInt(eventId, 10))
-    .single();
-  if (error) throw error;
-  return data;
+export async function getEvent(id: string) {
+  return apiGet<any>(`events.php?action=by_id&id=${id}`);
 }
 
-// Créer un événement
-export async function createEvent(choirId: string, name: string, eventDate: string, createdBy: number) {
-  const code = await generateUniqueCode();
-  const { data, error } = await supabase
-    .from('events')
-    .insert([{ choir_id: parseInt(choirId, 10), name, event_date: eventDate, created_by: createdBy, code }])
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+export async function getEventByCode(code: string) {
+  return apiGet<any>(`events.php?action=by_code&code=${encodeURIComponent(code)}`);
 }
 
-
-// Modifier un événement
-export async function updateEvent(eventId: string, name: string, eventDate: string) {
-  const { error } = await supabase
-    .from('events')
-    .update({ name, event_date: eventDate })
-    .eq('id', parseInt(eventId, 10))
-  if (error) throw error;
-}
-
-// Récupérer les chants associés à un événement
-export async function getEventSongs(eventId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('event_songs')
-    .select('song_id')
-    .eq('event_id', parseInt(eventId, 10));
-  if (error) throw error;
-  return (data || []).map((r) => r.song_id);
-}
-
-// Remplacer les chants associés à un événement
-// La mise à jour est faite en deux étapes (delete + insert) et n'est pas transactionnelle.
-// En cas d'erreur à l'insert, les associations existantes ont déjà été supprimées.
-export async function setEventSongs(eventId: string, songIds: string[]) {
-  // Supprimer les associations existantes
-  const { error: deleteError } = await supabase
-    .from('event_songs')
-    .delete()
-    .eq('event_id', parseInt(eventId, 10));
-  if (deleteError) throw deleteError;
-
-  // Insérer les nouvelles associations avec leur position
-  if (songIds.length > 0) {
-    const { error: insertError } = await supabase
-      .from('event_songs')
-      .insert(songIds.map((song_id, index) => ({ event_id: parseInt(eventId, 10), song_id, position: index })));
-    if (insertError) throw insertError;
-  }
-}
-
-
-// Récupérer les événements d'une chorale triés par date
 export async function getChoirEvents(choirId: string) {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('choir_id', parseInt(choirId, 10))
-    .order('event_date', { ascending: false });
-  if (error) throw error;
-  return data || [];
+  return apiGet<any[]>(`events.php?action=by_choir&choir_id=${choirId}`);
 }
 
+export async function getEventsByChoirIds(choirIds: string[]) {
+  return apiGet<any[]>(`events.php?action=by_choir_ids&choir_ids=${encodeURIComponent(choirIds.join(','))}`);
+}
 
-// Récupérer les chants associés à un événement avec leurs détails
-// Les chants sont récupérés en deux requêtes séparées (event_songs puis songs)
-// car Supabase ne supporte pas facilement les jointures avec tri personnalisé.
-// Le réordonnancement final garantit que l'ordre de position est respecté,
-// même si la deuxième requête ne garantit pas l'ordre des résultats.
+export async function getEventsByCodes(codes: string[]) {
+  return apiGet<any[]>(`events.php?action=by_codes&codes=${encodeURIComponent(codes.join(','))}`);
+}
+
+export async function getEventSongsTitles(eventId: string) {
+  return apiGet<any[]>(`events.php?action=song_titles&event_id=${eventId}`);
+}
+
 export async function getEventSongsDetails(eventId: string) {
-  const { data: links, error: linksError } = await supabase
-    .from('event_songs')
-    .select('song_id, position')
-    .eq('event_id', parseInt(eventId, 10))
-    .order('position');
-  if (linksError) throw linksError;
-  if (!links || links.length === 0) return [];
+  return apiGet<any[]>(`events.php?action=song_details&event_id=${eventId}`);
+}
 
-  const songIds = links.map((r) => r.song_id);
+export async function getEventSongs(eventId: string): Promise<string[]> {
+  const songs = await apiGet<any[]>(`events.php?action=song_titles&event_id=${eventId}`);
+  return songs.map((s: any) => String(s.id));
+}
 
-  const { data: songs, error: songsError } = await supabase
-    .from('songs')
-    .select('id, title, hashtags, code')
-    .in('id', songIds);
-  if (songsError) throw songsError;
+export async function setEventSongs(eventId: string, songIds: string[]): Promise<void> {
+  await apiPut(`events.php?action=update&id=${eventId}`, { song_ids: songIds });
+}
 
-  // Retrier selon l'ordre de position
-  return links.map((link) => {
-    const song = songs?.find((s) => s.id === link.song_id);
-    return {
-      ...song,
-      hashtags: song?.hashtags ? song.hashtags.split(',').filter(Boolean) : [],
-    };
+export async function incrementEventViews(id: string) {
+  return apiPost(`events.php?action=increment_views&id=${id}`);
+}
+
+export async function toggleEventActive(id: string, value: boolean) {
+  return apiPost(`events.php?action=toggle_active&id=${id}&value=${value}`);
+}
+
+export async function createEvent(
+  choirId: string,
+  name: string,
+  eventDate: string | null,
+  _createdBy?: number | null
+) {
+  return apiPost<any>('events.php?action=create', { name, choir_id: choirId, event_date: eventDate });
+}
+
+export async function updateEvent(
+  id: string,
+  name: string,
+  eventDate: string | null,
+  songIds?: string[]
+) {
+  return apiPut(`events.php?action=update&id=${id}`, {
+    name,
+    event_date: eventDate,
+    ...(songIds !== undefined ? { song_ids: songIds } : {}),
   });
 }
 
-// Supprimer un événement et ses liens avec les chants
-export async function deleteEvent(eventId: string) {
-  // Supprimer les liens dans la table de jointure
-  const { error: linksError } = await supabase
-    .from('event_songs')
-    .delete()
-    .eq('event_id', parseInt(eventId, 10));
-  if (linksError) throw linksError;
-
-  // Supprimer l'événement
-  const { error } = await supabase
-    .from('events')
-    .delete()
-    .eq('id', parseInt(eventId, 10));
-  if (error) throw error;
-}
-
-// Récupérer les ids des événements d'une chorale
-export async function getChoirEventIds(choirId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('events')
-    .select('id')
-    .eq('choir_id', parseInt(choirId, 10));
-  if (error) throw error;
-  return (data || []).map((e) => String(e.id));
-}
-
-// Récupérer un événement par son code
-export async function getEventByCode(code: string) {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('code', code)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Not found');
-
-  // Récupérer la chorale de rattachement
-  const { data: choirData } = await supabase
-    .from('choirs')
-    .select('id, code, name')
-    .eq('id', parseInt(data.choir_id, 10))
-    .maybeSingle();
-
-  return { ...data, choir: choirData || null };
-}
-
-// Récupérer tous les évènements pour une liste de chorales
-// Cette fonction utilisen .in() qui accepte un tableau vide — une garde
-// if (codes.length === 0) return [] est nécessaire pour éviter une requête invalide.
-export async function getEventsByChoirIds(choirIds: string[]) {
-  if (choirIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .in('choir_id', choirIds.map((id) => parseInt(id, 10)));
-  if (error) throw error;
-  return data || [];
-}
-
-
-// Cette fonction utilisen .in() qui accepte un tableau vide — une garde
-// if (codes.length === 0) return [] est nécessaire pour éviter une requête invalide.
-export async function getEventsByCodes(codes: string[]) {
-  if (codes.length === 0) return [];
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .in('code', codes);
-  if (error) throw error;
-  return data || [];
-}
-
-
-export async function getEventSongsTitles(eventId: string): Promise<{ id: string; title: string; code: string | null }[]> {
-  // Étape 1 : récupérer les song_ids de l'événement, ordonnés par position
-  const { data: eventSongs, error: e1 } = await supabase
-    .from('event_songs')
-    .select('song_id')
-    .eq('event_id', parseInt(eventId, 10))
-    .order('position');
-  if (e1) throw e1;
-  if (!eventSongs || eventSongs.length === 0) return [];
-
-  const songIds = eventSongs.map((row: any) => row.song_id);
-
-  // Étape 2 : récupérer les titres des chants correspondants
-  const { data: songs, error: e2 } = await supabase
-    .from('songs')
-    .select('id, title, code')  
-    .in('id', songIds);
-  if (e2) throw e2;
-
-  // Réordonner selon l'ordre de l'événement (l'étape 2 ne garantit pas l'ordre)
-  return songIds
-    .map((id: string) => songs.find((s: any) => s.id === id))
-    .filter((s): s is { id: string; title: string; code: string | null } => !!s);
-}
-
-
-// Modifier l'activité d'un évènement
-export async function toggleEventActive(eventId: string, active: boolean) {
-  const { error } = await supabase
-    .from('events')
-    .update({ active })
-    .eq('id', parseInt(eventId, 10));
-  if (error) throw error;
-}
-
-
-export async function incrementEventViews(eventId: string) {
-  try {
-    const { data } = await supabase
-      .from('events')
-      .select('views')
-      .eq('id', parseInt(eventId, 10))
-      .single();
-    await supabase
-      .from('events')
-      .update({ views: (data?.views ?? 0) + 1 })
-      .eq('id', parseInt(eventId, 10));
-  } catch {}
+export async function deleteEvent(id: string) {
+  return apiDelete(`events.php?action=delete&id=${id}`);
 }

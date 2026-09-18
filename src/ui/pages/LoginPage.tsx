@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, login, signOut } from '../../infrastructure/storage/authService';
-import { translateSupabaseError } from '../../infrastructure/storage/translateSupabaseError';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -60,10 +59,6 @@ export default function LoginPage() {
   }, []);
 
   // Validation du formulaire de connexion
-  // La connexion gère deux cas distincts via la fonction login() :
-  // - Utilisateur existant → connexion normale, redirection vers '/'
-  // - Nouvel utilisateur créé via MAGIC_SECRET (compte créé par un admin) →
-  //   redirection vers '/reset-request' pour définir son mot de passe initial  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -72,23 +67,17 @@ export default function LoginPage() {
     try {
       const result = await login(email, password);
       setMessage(result.message);
-
-      if (result.isNewUser) {
-        // Nouvel utilisateur créé via MAGIC_SECRET → rediriger vers la réinitialisation du mot de passe
-        navigate('/reset-request');
-      } else {
-        // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
-        setUser({ email: result.email!, isAdmin: result.isAdmin });
-        navigate('/');
-      }
+      // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
+      setUser({ email: result.email!, isAdmin: result.isAdmin });
+      navigate('/');
     } catch (err: any) {
-      setMessage(translateSupabaseError(err.message));
+      setMessage(err.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
   };
 
-  // La déconnexion via signOut() invalide la session Supabase côté client.
+  // La déconnexion via signOut() invalide la session côté client.
   // Le localStorage (chorales, événements) n'est PAS effacé lors de la déconnexion
   // pour permettre un accès offline aux données préalablement mémorisées.  
   const handleLogout = async () => {

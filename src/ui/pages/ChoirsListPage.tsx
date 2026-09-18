@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUserParam, getUserDelegations } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParam, getUserDelegations, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
@@ -11,6 +11,7 @@ import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function MyChoirsPage() {
   const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   // Chorales rejointes ou possédées explicitement
   const [choirs, setChoirs] = useState<any[]>([]);
   // Chorales fantômes : chorales de rattachement d'événements rejoints directement,
@@ -66,7 +67,7 @@ export default function MyChoirsPage() {
       // Format : [{ id, code: '12345678', name: 'Ma chorale' }, ...]
       const joined = getStoredChoirs();
 
-      // Extraire uniquement les codes pour les requêtes Supabase
+      // Extraire uniquement les codes pour les requêtes bdd MySQL
       const joinedCodes = joined.map((c) => c.code);
 
       // Redirection si aucune chorale, aucun événement, et pas le droit de créer
@@ -101,7 +102,7 @@ export default function MyChoirsPage() {
         return;
       }
 
-      // Contiendra toutes les chorales chargées depuis Supabase,
+      // Contiendra toutes les chorales chargées depuis bdd MySQL,
       // utilisé à la fin pour synchroniser les événements en localStorage
       // et calculer les chorales fantômes
       let allLoadedChoirs: any[] = [];
@@ -109,27 +110,30 @@ export default function MyChoirsPage() {
       if (currentUser) {
         // ── CAS 1 : Utilisateur connecté ──────────────────────────────
         setUser(currentUser);
+        const admin = await isCurrentUserAdmin();
+        if (cancelled.current) return;
+        setIsAdmin(admin);        
         try {
           // Récupérer le quota de chorales autorisées pour cet utilisateur
           const param = await getUserParam(currentUser.email!);
           // Si timeout déclenché
           if (cancelled.current) return;
 
-          // Récupérer les chorales dont l'utilisateur est propriétaire depuis Supabase
+          // Récupérer les chorales dont l'utilisateur est propriétaire depuis bdd MySQL
           const choirData = await getOwnedChoirs(currentUser.id);
           // Si timeout déclenché
           if (cancelled.current) return;
 
           // Déterminer si l'utilisateur peut encore créer une chorale
-          // (nombre de chorales possédées < quota autorisé)
+          // (nombre de chorales possédées < quota autorisé) ou (admin)
           if (param) {
-            setCanCreate(choirData.length < param.choirs_nb);
+            setCanCreate(isAdmin || choirData.length < param.choirs_nb);
           }
 
           // Synchroniser les chorales propriétaires dans le localStorage :
-          // on part des chorales Supabase (source de vérité) et on complète
+          // on part des chorales bdd MySQL (source de vérité) et on complète
           // avec les chorales rejointes déjà en localStorage.
-          // Le nom est toujours pris depuis Supabase pour rester à jour.
+          // Le nom est toujours pris depuis bdd MySQL pour rester à jour.
           const updated = choirData.map((c) => ({ code: String(c.code), name: c.name, id: c.id }));
           joined.forEach((existing) => {
             // Ajouter les chorales rejointes (non propriétaires) si pas déjà présentes
@@ -173,7 +177,7 @@ export default function MyChoirsPage() {
         } catch {
           // Déclenchement de la bannière Offline
           if (!cancelled.current) setShowOfflineBanner(true);
-          // Fallback offline : Supabase inaccessible
+          // Fallback offline : bdd MySQL inaccessible
           // Reconstituer des objets minimalistes depuis le localStorage pour l'affichage
           const fallback = joined.map((c) => ({ id: c.id, name: c.name, code: c.code }));
           setChoirs(fallback);
@@ -198,7 +202,7 @@ export default function MyChoirsPage() {
           } catch {
             // Déclenchement de la bannière Offline
             if (!cancelled.current) setShowOfflineBanner(true);
-            // Fallback offline : Supabase inaccessible
+            // Fallback offline : bdd MySQL inaccessible
             const fallback = joined.map((c) => ({ id: c.id, name: c.name, code: c.code }));
             setChoirs(fallback);
             allLoadedChoirs = fallback;
@@ -215,12 +219,12 @@ export default function MyChoirsPage() {
       // ── Pourquoi synchroniser les événements ici ? ──────────────────────────
       // MyChoirsPage est la page "hub" de l'application — elle est visitée
       // à chaque session. C'est ici que le localStorage est mis à jour pour
-      // refléter l'état réel de Supabase : événements supprimés purgés,
+      // refléter l'état réel de bdd MySQL : événements supprimés purgés,
       // nouveaux événements ajoutés, chants mis à jour.
 
       // ── Synchroniser les événements en localStorage ──────────────────
       // Cette étape s'exécute que l'utilisateur soit connecté ou non,
-      // tant que Supabase est accessible (pas dans un bloc catch).
+      // tant que bdd MySQL est accessible (pas dans un bloc catch).
       // Elle met aussi à jour les chorales fantômes.
       try {
         // PARTIE 1 : récupérer tous les événements des chorales chargées
@@ -259,7 +263,7 @@ export default function MyChoirsPage() {
         });
 
         // PARTIE 4 : sauvegarder en localStorage
-        // Les événements supprimés de Supabase sont automatiquement exclus.
+        // Les événements supprimés de bdd MySQL sont automatiquement exclus.
         // Pour chaque événement, on enrichit avec les infos de la chorale :
         // - depuis allLoadedChoirs si la chorale est connue
         // - sinon depuis le localStorage existant (fallback pour les événements directs)
@@ -328,7 +332,7 @@ export default function MyChoirsPage() {
       } catch {
         // Déclenchement de la bannière Offline
         if (!cancelled.current) setShowOfflineBanner(true);
-        // Offline ou erreur Supabase : on conserve le localStorage tel quel.
+        // Offline ou erreur bdd MySQL : on conserve le localStorage tel quel.
         // On calcule quand même les chorales fantômes depuis le localStorage existant.
         const existingEvents = getStoredEvents();
         const ghosts = existingEvents
@@ -362,7 +366,7 @@ export default function MyChoirsPage() {
       } else {
         // Connecté
         const ownedIds = allLoadedChoirs
-          .filter((c: any) => c.owner_id === currentUser.id)
+          .filter((c: any) => Number(c.owner_id) === Number(currentUser.id))
           .map((c: any) => c.id);
         const param = await getUserParam(currentUser.email!).catch(() => null);
         if (ownedIds.length > 0 || (param && param.choirs_nb > 0)) profiles.push('owner');
@@ -420,7 +424,7 @@ export default function MyChoirsPage() {
               {/* Pas d'icône d'action pour les chorales fantômes :
                   l'utilisateur ne peut ni les supprimer ni les quitter */}
               {!c.ghost && (
-                user && c.owner_id === user.id ? (
+                user && Number(c.owner_id) === Number(user.id) ? (
                   // Propriétaire → icône suppression
                   <i
                     className="fa fa-trash trash"

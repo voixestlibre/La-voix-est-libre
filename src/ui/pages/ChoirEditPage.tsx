@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { getCurrentUser, getUserParam } from '../../infrastructure/storage/authService';
-import { updateChoir, createChoir, countOwnedChoirs } from '../../infrastructure/storage/choirsService';
+import { updateChoir, createChoir, countOwnedChoirs, getChoir, toggleExternalFiles } from '../../infrastructure/storage/choirsService';
 import { getStoredChoirs, setStoredChoirs } from '../../infrastructure/storage/localStorageService';
+import { isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -23,6 +24,8 @@ export default function ChoirEditPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const navigate = useNavigate();
   const [helpProfiles] = useState<UserProfile[]>(['owner']);
+  const [usesExternalFiles, setUsesExternalFiles] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -30,6 +33,14 @@ export default function ChoirEditPage() {
       const currentUser = await getCurrentUser();
       if (!currentUser) { navigate('/'); return; }
       setUser(currentUser);
+
+      // Déterminer si la chorale permet d'utiliser les partitions en ligne
+      const admin = await isCurrentUserAdmin();
+      setIsAdmin(admin);
+      if (isEditing) {
+        const choirData = await getChoir(choirId!);
+        setUsesExternalFiles(!!choirData.uses_external_files);
+      }      
 
       // Récupérer le quota de chorales autorisées
       const param = await getUserParam(currentUser.email!);
@@ -111,6 +122,24 @@ export default function ChoirEditPage() {
                 required
                 className="page-form-input"
               />
+
+              {isAdmin && isEditing && (
+                <div style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <span style={{ fontSize: '0.9rem' }}>Accès aux fichiers larminat.fr :</span>
+                  <button
+                    type="button"
+                    className={usesExternalFiles ? 'page-button' : 'page-button2'}
+                    style={{ padding: '0.3rem 0.8rem', fontSize: '0.85rem' }}
+                    onClick={async () => {
+                      await toggleExternalFiles(choirId!, !usesExternalFiles);
+                      setUsesExternalFiles(!usesExternalFiles);
+                    }}
+                  >
+                    {usesExternalFiles ? 'Autorisé' : 'Non autorisé'}
+                  </button>
+                </div>
+              )}
+
               <button className="page-button" type="submit" disabled={loading}>
                 {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
               </button>

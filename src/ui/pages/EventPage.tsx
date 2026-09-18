@@ -128,7 +128,7 @@ export default function EventPage() {
               .filter((f) => String(f.songId) === String(song.id) && f.fileName.toLowerCase().endsWith('.pdf'))
               .map((f) => ({ name: f.fileName, url: f.url }));
           } else {
-            // Online : récupérer depuis Supabase
+            // Online : récupérer depuis bdd MySQL
             const allFiles = await getSongFiles(String(song.id), song.title, song.code ?? undefined);
             pdfFiles = allFiles.filter((f: any) => f.name.toLowerCase().endsWith('.pdf'));
           }
@@ -148,7 +148,7 @@ export default function EventPage() {
                 const url = cachedUrl ?? publicUrl;
                 pdfBytes = await fetch(url).then((r) => r.arrayBuffer());
               } else {
-                // Online : récupérer depuis Supabase ou externe
+                // Online : récupérer depuis bdd MySQL ou externe
                 const url = pdfFile.url ?? getSongFileUrl(String(song.id), pdfFile.name);
                 pdfBytes = await fetch(url).then((r) => r.arrayBuffer());
               }
@@ -268,7 +268,7 @@ export default function EventPage() {
       // L'utilisateur a accès si :
       // - il a rejoint l'événement directement (storedEvent trouvé)
       // - OU il a rejoint la chorale de rattachement (isChoirMember)
-      // Note : le cas propriétaire sera vérifié après l'appel Supabase
+      // Note : le cas propriétaire sera vérifié après l'appel bdd MySQL
       const hasLocalAccess = !!storedEvent || isChoirMember;
 
       // Vrai uniquement si l'événement a été rejoint directement
@@ -279,7 +279,7 @@ export default function EventPage() {
       let creatorCheckLocal = false;
 
       try {
-        // Récupérer l'événement depuis Supabase
+        // Récupérer l'événement depuis bdd MySQL
         const eventData = await getEvent(eventId!);
         setEvent(eventData);
 
@@ -295,13 +295,13 @@ export default function EventPage() {
 
         // Vérifier si l'utilisateur est propriétaire de la chorale
         const ownerId = await getChoirOwner(String(eventData.choir_id));
-        const ownerCheck = currentUser && ownerId === currentUser.id;
+        const ownerCheck = currentUser && Number(ownerId) === Number(currentUser.id);
 
         // Si timeout déclenché
         if (cancelled.current) return;        
 
         if (ownerCheck) setIsOwner(true);
-        ownerCheckLocal = !!(currentUser && ownerId === currentUser.id);
+        ownerCheckLocal = !!(currentUser && Number(ownerId) === Number(currentUser.id));
 
         // Vérifier si l'utilisateur est le créateur de l'événement
         const userParamId = currentUser ? await getUserParamId(currentUser.email!) : null;
@@ -344,7 +344,7 @@ export default function EventPage() {
         if (!cancelled.current) setShowOfflineBanner(true);
 
         // ── Fallback offline ─────────────────────────────────────────────
-        // Supabase inaccessible : on reconstruit ce qu'on peut depuis le localStorage
+        // bdd MySQL inaccessible : on reconstruit ce qu'on peut depuis le localStorage
 
         // Vérifier les droits d'accès offline
         if (!hasLocalAccess) {

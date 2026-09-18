@@ -28,7 +28,7 @@ export default function LeaveChoirPage() {
         const data = await getChoir(id!);
         setChoirName(data.name);
         // Rediriger le propriétaire vers la page de la chorale        
-        if (currentUser && data.owner_id === currentUser.id) {
+        if (currentUser && Number(data.owner_id) === Number(currentUser.id)) {
           navigate(`/choir/${id}`, { replace: true });
           return;
         }        

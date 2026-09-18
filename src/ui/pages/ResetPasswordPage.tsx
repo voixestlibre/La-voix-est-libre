@@ -1,53 +1,48 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { setSessionFromHash, resetPassword } from '../../infrastructure/storage/authService';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { verifyResetToken, resetPassword } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
-import { type UserProfile } from '../components/helpData'; 
+import { type UserProfile } from '../components/helpData';
 
 export default function ResetPasswordPage() {
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
-  const [ready, setReady] = useState(false);
-  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') ?? '';
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [message, setMessage] = useState('');
+  const [tokenValid, setTokenValid] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
 
   useEffect(() => {
-    // Cette page est accessible depuis un lien email envoyé par Supabase.
-    // Le lien contient un access_token et un refresh_token dans le hash de l'URL (#).
-    // Ces tokens sont extraits et utilisés pour établir une session temporaire
-    // qui permet uniquement de réinitialiser le mot de passe.
-    // Si les tokens sont absents ou invalides, un message d'erreur est affiché.
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-
-    if (!accessToken) {
-      setMessage("Lien invalide ou expiré. Veuillez refaire une demande de réinitialisation.");
-      setPageLoading(false);
+    if (!token) {
+      setMessage('Lien invalide.');
+      setLoading(false);
       return;
     }
+    verifyResetToken(token)
+      .then(() => { setTokenValid(true); setLoading(false); })
+      .catch(() => { setMessage('Lien invalide ou expiré.'); setLoading(false); });
+  }, [token]);
 
-    setSessionFromHash(accessToken, refreshToken || '')
-      .then(() => { setReady(true); setPageLoading(false); })
-      .catch(() => { setMessage("Session invalide. Veuillez refaire une demande de réinitialisation."); setPageLoading(false); });
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (password.length < 6) {
+      setMessage('Le mot de passe doit faire au moins 6 caractères.');
+      return;
+    }
+    if (password !== confirm) {
+      setMessage('Les mots de passe ne correspondent pas.');
+      return;
+    }
     setLoading(true);
-    setMessage('');
     try {
-      await resetPassword(password);
-      setMessage('Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter.');
-      setSuccess(true);
-      setPassword('');
+      await resetPassword(token, password);
+      setMessage('Mot de passe réinitialisé. Vous pouvez vous connecter.');
+      setTimeout(() => navigate('/login'), 2000);
     } catch (err: any) {
-      setMessage(`Erreur : ${err.message}`);
+      setMessage(err.message || 'Une erreur est survenue.');
     } finally {
       setLoading(false);
     }
@@ -56,29 +51,45 @@ export default function ResetPasswordPage() {
   return (
     <div className="page-container">
       <TopBar helpPage="login" helpProfiles={helpProfiles} />
-      <h2>Réinitialisation du mot de passe</h2>
-
-      {pageLoading || loading ? <div className="spinner"></div> : (
+      <h2>Nouveau mot de passe</h2>
+      {loading && <div className="spinner"></div>}
+      {!loading && !tokenValid && (
+        <p style={{ color: 'red' }}>{message}</p>
+      )}
+      {!loading && tokenValid && (
         <>
-          {ready && !success && (
-            <form onSubmit={handleSubmit}>
-              <input type="password" placeholder="Nouveau mot de passe" value={password}
-                onChange={(e) => setPassword(e.target.value)} required className="page-form-input" />
-              <button type="submit" className="page-button">
-                Valider
-              </button>
-            </form>
-          )}
+          <input
+            type="password"
+            placeholder="Nouveau mot de passe (6 caractères min.)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="page-form-input"
+            style={{ marginBottom: '0.5rem' }}
+          />
+          <input
+            type="password"
+            placeholder="Confirmer le mot de passe"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+            className="page-form-input"
+            style={{ marginBottom: '1rem' }}
+          />
           {message && (
-            <div>
-              <p>{message}</p>
-              <button className="page-button" onClick={() => navigate('/login')}>
-                Se connecter
-              </button>
-            </div>
+            <p style={{ color: message.includes('réinitialisé') ? 'green' : 'red' }}>
+              {message}
+            </p>
           )}
+          <button className="page-button" onClick={handleSubmit} disabled={loading}>
+            Valider
+          </button>
         </>
       )}
+      <div style={{ marginTop: '0.5rem' }}>
+        <button className="page-button2" onClick={() => navigate('/login')}>
+          Retour à la connexion
+        </button>
+      </div>
     </div>
   );
 }

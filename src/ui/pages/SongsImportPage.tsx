@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
-import { createSong, uploadSongFile, fileExists, updateSong, getSongByTitle } from '../../infrastructure/storage/songsService';
+import { createSong, uploadSongFile, fileExists, updateSong, 
+  getSongByTitle, EXTERNAL_SONG_BASE_URL } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -32,7 +33,7 @@ export default function ImportSongPage() {
       const currentUser = await getCurrentUser();
       if (!currentUser) { navigate('/'); return; }
       const ownerId = await getChoirOwner(choirId!);
-      if (ownerId !== currentUser.id) {
+      if (Number(ownerId) !== Number(currentUser.id)) {
         navigate(`/choir/${choirId}`, { replace: true });
       }
       setPageLoading(false);
@@ -82,9 +83,9 @@ export default function ImportSongPage() {
     if (existingSong) {
       if (!existingSong.code && songCode) {
         // Mettre à jour le code
-        const hashtags = existingSong.hashtags
-          ? existingSong.hashtags.split(',').filter(Boolean)
-          : [];
+        const hashtags = Array.isArray(existingSong.hashtags)
+          ? existingSong.hashtags
+          : (existingSong.hashtags ? existingSong.hashtags.split(',').filter(Boolean) : []);
         await updateSong(existingSong.id, existingSong.title, hashtags, songCode);
         report.errors.push(`Chant existant — Code "${songCode}" associé.`);
       } else if (existingSong.code && existingSong.code !== songCode) {
@@ -105,7 +106,6 @@ export default function ImportSongPage() {
   
     // Les noms de fichiers sont normalisés avant upload : accents supprimés,
     // ligatures (œ, æ) remplacées, virgules et points-virgules supprimés
-    // pour éviter des problèmes d'URL dans le bucket Supabase
     for (const fileEntry of entries) {
       if (!fileEntry.isFile) continue;
       const file = await readFile(fileEntry as FileSystemFileEntry);
@@ -124,6 +124,20 @@ export default function ImportSongPage() {
           .replace(/[,;]/g, '')
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const finalName = `${cleanName}.${ext}`;
+
+        // Si le chant a un code et que la chorale autorise les fichiers
+        // externes, vérifier si un fichier externe existe déjà pour cette extension
+        // (même nom logique affiché → doublon à éviter)
+        if (songCode) {
+          const externalUrl = `${EXTERNAL_SONG_BASE_URL}${songCode}/${songCode}.${ext}`;
+          try {
+            const headRes = await fetch(externalUrl, { method: 'HEAD' });
+            if (headRes.ok) {
+              report.skippedFiles.push(`${finalName} (fichier externe ${songCode}.${ext} déjà présent)`);
+              continue;
+            }
+          } catch {}
+        }        
   
         const alreadyExists = await fileExists(song.id, finalName);
         if (alreadyExists) {
@@ -174,7 +188,7 @@ export default function ImportSongPage() {
     const currentUser = await getCurrentUser();
     if (!currentUser) { navigate('/'); return; }
     const ownerId = await getChoirOwner(choirId!);
-    if (ownerId !== currentUser.id) { navigate('/'); return; }
+    if (Number(ownerId) !== Number(currentUser.id)) { navigate('/'); return; }
 
     // La vérification des droits est doublée (useEffect + handleDrop) pour
     // garantir la sécurité même si quelqu'un accède à la page et glisse
