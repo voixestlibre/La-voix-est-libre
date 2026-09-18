@@ -127,7 +127,7 @@ export default function MyChoirsPage() {
           // Déterminer si l'utilisateur peut encore créer une chorale
           // (nombre de chorales possédées < quota autorisé) ou (admin)
           if (param) {
-            setCanCreate(admin || choirData.length < param.choirs_nb);
+            setCanCreate(isAdmin || choirData.length < param.choirs_nb);
           }
 
           // Synchroniser les chorales propriétaires dans le localStorage :
