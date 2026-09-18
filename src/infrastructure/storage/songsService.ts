@@ -40,6 +40,13 @@ export async function incrementSongViews(id: string) {
 }
 
 export async function deleteSong(id: string) {
+  // Supprimer d'abord les fichiers physiques dans fichiersUtilisateurs
+  try {
+    await apiDelete(`upload.php?action=delete_all&song_id=${id}`);
+  } catch {
+    // Ignorer si le dossier n'existe pas
+  }
+  // Puis supprimer le chant en base
   return apiDelete(`songs.php?action=delete&id=${id}`);
 }
 
