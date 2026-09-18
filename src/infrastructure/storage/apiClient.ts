@@ -1,7 +1,9 @@
 // src/infrastructure/storage/apiClient.ts
 // Client HTTP central pour l'API PHP 
 
-const API_BASE = `${import.meta.env.BASE_URL}api`;
+const API_BASE = import.meta.env.DEV
+  ? 'https://www.larminat.fr/lavoixestlibre/api'
+  : `${import.meta.env.BASE_URL}api`;
 
 type ApiResponse<T> = {
   success: boolean;

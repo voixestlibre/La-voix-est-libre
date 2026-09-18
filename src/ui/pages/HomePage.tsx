@@ -27,9 +27,31 @@ export default function HomePage() {
 
   // Gestion du logo (offline / online)
   useEffect(() => {
+    // Au montage : utiliser le logo en cache si disponible
+    const cached = localStorage.getItem('app_logo_b64');
+    if (cached) {
+      setLogoSrc(cached);
+      return;
+    }
+    // Sinon : essayer de charger le logo bundle et le mettre en cache
+    fetch(logo)
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const b64 = reader.result as string;
+          localStorage.setItem('app_logo_b64', b64);
+          setLogoSrc(b64);
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {
+        // Offline et pas de cache — le logo bundle s'affiche via l'import Vite
+      });
+    // Écouter l'événement offline pour basculer si connexion perdue pendant la session
     const handleOffline = () => {
-      const cached = localStorage.getItem('app_logo_b64');
-      if (cached) setLogoSrc(cached);
+      const freshCached = localStorage.getItem('app_logo_b64');
+      if (freshCached) setLogoSrc(freshCached);
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
