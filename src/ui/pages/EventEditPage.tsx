@@ -81,7 +81,7 @@ export default function EventEditPage() {
             getEventSongs(eventId!),
           ]);
           setAvailableSongs(songs);
-          setSelectedSongIds(eventSongIds);
+          setSelectedSongIds(eventSongIds.map(String));
           setPageLoading(false);
         } catch {
           navigate('/');
@@ -108,11 +108,10 @@ export default function EventEditPage() {
   }, [choirId, eventId, navigate, isEditing]);
 
   // Cocher / décocher un chant
-  const toggleSong = (songId: string) => {
+  const toggleSong = (id: string | number) => {
+    const sid = String(id);
     setSelectedSongIds((prev) =>
-      prev.includes(songId)
-        ? prev.filter((id) => id !== songId)
-        : [...prev, songId]
+      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
     );
   };
 
@@ -157,7 +156,7 @@ export default function EventEditPage() {
     try {
       // Chants sélectionnés sous forme { id, title } pour le cache offline
       const songsForStorage = selectedSongIds.map((songId) => {
-        const song = availableSongs.find((s) => s.id === songId);
+        const song = availableSongs.find((s) => String(s.id) === String(songId));
         return { id: songId, title: song?.title ?? '' };
       });
 
@@ -282,7 +281,7 @@ export default function EventEditPage() {
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
                     {selectedSongIds.map((id, index) => {
-                      const song = availableSongs.find((s) => s.id === id);
+                      const song = availableSongs.find((s) => String(s.id) === String(id));
                       if (!song) return null;
                       return (
                         <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', backgroundColor: '#E6F2FF', borderRadius: '8px', padding: '0.4rem 0.8rem' }}>
@@ -338,7 +337,7 @@ export default function EventEditPage() {
 
                 const SongCheckbox = ({ s }: { s: any }) => (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={selectedSongIds.includes(s.id)} onChange={() => toggleSong(s.id)}
+                    <input type="checkbox" checked={selectedSongIds.includes(String(s.id))} onChange={() => toggleSong(s.id)}
                       style={{ width: '1.2rem', height: '1.2rem', accentColor: '#044C8D' }} />
                     <span>
                       {s.title}
