@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUserParam, getUserDelegations } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParam, getUserDelegations, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getOwnedChoirs, getChoirsByCodes } from '../../infrastructure/storage/choirsService';
 import { getEventsByCodes, getEventsByChoirIds, getEventSongsTitles } from '../../infrastructure/storage/eventsService';
 import { getStoredChoirs, setStoredChoirs, getStoredEvents, setStoredEvents } from '../../infrastructure/storage/localStorageService';
@@ -11,6 +11,7 @@ import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function MyChoirsPage() {
   const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   // Chorales rejointes ou possédées explicitement
   const [choirs, setChoirs] = useState<any[]>([]);
   // Chorales fantômes : chorales de rattachement d'événements rejoints directement,
@@ -109,6 +110,9 @@ export default function MyChoirsPage() {
       if (currentUser) {
         // ── CAS 1 : Utilisateur connecté ──────────────────────────────
         setUser(currentUser);
+        const admin = await isCurrentUserAdmin();
+        if (cancelled.current) return;
+        setIsAdmin(admin);        
         try {
           // Récupérer le quota de chorales autorisées pour cet utilisateur
           const param = await getUserParam(currentUser.email!);
@@ -121,9 +125,9 @@ export default function MyChoirsPage() {
           if (cancelled.current) return;
 
           // Déterminer si l'utilisateur peut encore créer une chorale
-          // (nombre de chorales possédées < quota autorisé)
+          // (nombre de chorales possédées < quota autorisé) ou (admin)
           if (param) {
-            setCanCreate(choirData.length < param.choirs_nb);
+            setCanCreate(admin || choirData.length < param.choirs_nb);
           }
 
           // Synchroniser les chorales propriétaires dans le localStorage :

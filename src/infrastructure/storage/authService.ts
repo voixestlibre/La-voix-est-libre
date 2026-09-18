@@ -79,3 +79,15 @@ export async function verifyResetToken(token: string): Promise<{ email: string }
 export async function resetPassword(token: string, password: string): Promise<void> {
   await apiPost('auth.php?action=reset_password', { token, password });
 }
+
+export async function listUsers(): Promise<any[]> {
+  return apiGet<any[]>('users.php?action=list');
+}
+
+export async function toggleAdmin(userId: number, value: boolean): Promise<void> {
+  await apiPost(`users.php?action=toggle_admin&id=${userId}&value=${value}`);
+}
+
+export async function apiUpdateChoirsNb(userId: number, value: number): Promise<void> {
+  await apiPost(`users.php?action=update_choirs_nb&id=${userId}&value=${value}`);
+}
