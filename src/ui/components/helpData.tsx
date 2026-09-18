@@ -571,11 +571,28 @@ export const helpContent: Record<string, Partial<Record<UserProfile | 'all', Hel
     all: { sections: [
         { icon: 'fa-user-plus', title: 'Ajouter un utilisateur',
           content: (<>
-            <p style={{ marginTop:'0', marginBottom:'0.4rem' }}>Cette page, accessible uniquement aux admin, permet de créer un nouvel utilisateur.</p>
-            <p style={{ margin:'0' }}>Le nouvel utilisateur aura la possibilité de créer une chorale, mais n'aura pas le droit d'admin.</p>
+            <p style={{ margin:'0', }}>
+              Saisissez l'email et le mot de passe initial. 
+              L'utilisateur pourra modifier son mot de passe via "Mot de passe oublié" sur la page de connexion.
+            </p>
+          </> ), },
+        { icon: 'fa-users-gear', title: 'Gestion des utilisateurs',
+          content: (<>
+            <p style={{ marginBottom:'0.4rem', marginTop:'0' }}>
+              La liste des utilisateurs est affichée sous le formulaire, et indique 
+              pour chaque utilisateur ses chorales en propriété et ses délégations.
+            </p>
+            <p style={{ marginBottom:'0.4rem', marginTop:'0' }}>
+              Les flèches <span style={{ color: '#666' }}>▲</span> et <span style={{ color: '#666' }}>▼</span> permettent d'ajuster 
+              le nombre de chorales qu'un utilisateur est autorisé à créer (visible uniquement pour les non-admins).
+            </p>
+            <p style={{ margin:'0' }}>
+              Le bouton "Admin" permet d'accorder ou de retirer 
+              le statut administrateur à un utilisateur — sauf à soi-même.
+            </p>
           </>), },
       ], },
-  },  
+  },
 
 
 };
