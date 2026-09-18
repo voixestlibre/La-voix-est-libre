@@ -59,10 +59,6 @@ export default function LoginPage() {
   }, []);
 
   // Validation du formulaire de connexion
-  // La connexion gère deux cas distincts via la fonction login() :
-  // - Utilisateur existant → connexion normale, redirection vers '/'
-  // - Nouvel utilisateur créé via MAGIC_SECRET (compte créé par un admin) →
-  //   redirection vers '/reset-request' pour définir son mot de passe initial  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -71,15 +67,9 @@ export default function LoginPage() {
     try {
       const result = await login(email, password);
       setMessage(result.message);
-
-      if (result.isNewUser) {
-        // Nouvel utilisateur créé via MAGIC_SECRET → rediriger vers la réinitialisation du mot de passe
-        navigate('/reset-request');
-      } else {
-        // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
-        setUser({ email: result.email!, isAdmin: result.isAdmin });
-        navigate('/');
-      }
+      // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
+      setUser({ email: result.email!, isAdmin: result.isAdmin });
+      navigate('/');
     } catch (err: any) {
       setMessage(err.message || 'Une erreur est survenue');
     } finally {
