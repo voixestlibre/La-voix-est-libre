@@ -25,7 +25,7 @@ export default function HomePage() {
   const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
     setShowOfflineBanner, forceOffline, cancelled } = usePageLoader();
 
-  // Gestion du logo (offline / online)
+  // Gestion du logo (mode offline / online)
   useEffect(() => {
     // Au montage : utiliser le logo en cache si disponible
     const cached = localStorage.getItem('app_logo_b64');
