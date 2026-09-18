@@ -28,8 +28,8 @@ export default function ResetPasswordPage() {
   }, [token]);
 
   const handleSubmit = async () => {
-    if (password.length < 8) {
-      setMessage('Le mot de passe doit faire au moins 8 caractères.');
+    if (password.length < 6) {
+      setMessage('Le mot de passe doit faire au moins 6 caractères.');
       return;
     }
     if (password !== confirm) {
@@ -60,7 +60,7 @@ export default function ResetPasswordPage() {
         <>
           <input
             type="password"
-            placeholder="Nouveau mot de passe (8 caractères min.)"
+            placeholder="Nouveau mot de passe (6 caractères min.)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="page-form-input"
