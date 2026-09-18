@@ -23,6 +23,7 @@ export default function ChoirPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'events' | 'songs'>('events');
   const [groupByHashtag, setGroupByHashtag] = useState(false);
+  const [selectedHashtag, setSelectedHashtag] = useState<string>('');
 
   const [isDelegate, setIsDelegate] = useState(false);
   const [userParamId, setUserParamId] = useState<number | null>(null);
@@ -483,7 +484,7 @@ export default function ChoirPage() {
                     <i className="fa fa-arrow-down-a-z"></i> &nbsp; Alphabétique
                   </button>
                   <button
-                    onClick={() => setGroupByHashtag(true)}
+                    onClick={() => { setGroupByHashtag(true); setSelectedHashtag(''); }}
                     style={{
                       flex: 1, padding: '0.4rem', border: 'none', borderRadius: '6px', cursor: 'pointer',
                       backgroundColor: groupByHashtag ? '#044C8D' : 'transparent',
@@ -654,7 +655,38 @@ export default function ChoirPage() {
               ) : (
                 // ── Vue par hashtag ──
                 <>
-                  {getGroupedSongs(filteredSongs).map(({ tag, songs: groupSongs }) => (
+                  {/* Filtre par hashtag */}
+                  <div style={{ margin: '0.5rem 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                    <select
+                      value={selectedHashtag}
+                      onChange={(e) => setSelectedHashtag(e.target.value)}
+                      style={{
+                        border: '2px solid #044C8D', borderRadius: '8px',
+                        padding: '0.3rem 0.6rem', fontSize: '0.9rem',
+                        color: '#044C8D', backgroundColor: 'white', cursor: 'pointer',
+                      }}
+                    >
+                      <option value="">Tous les hashtags</option>
+                      {Array.from(new Set(filteredSongs.flatMap((s) => s.hashtags || []))).sort()
+                        .map((tag) => (
+                          <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                    </select>
+                    <span style={{ fontSize: '0.85rem', color: '#888' }}>
+                      {(() => {
+                        const n = selectedHashtag
+                          ? filteredSongs.filter((s) => s.hashtags?.includes(selectedHashtag)).length
+                          : filteredSongs.length;
+                        return `${n} chant${n > 1 ? 's' : ''}`;
+                      })()}
+                    </span>
+                  </div>
+                
+                  {getGroupedSongs(
+                    selectedHashtag
+                      ? filteredSongs.filter((s) => s.hashtags?.includes(selectedHashtag))
+                      : filteredSongs
+                  ).map(({ tag, songs: groupSongs }) => (                    
                     <div key={tag} style={{ marginBottom: '1.2rem' }}>
                       <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '0.5rem 0' }}>{tag}</p>
                       <ul className="list-music">
@@ -687,7 +719,11 @@ export default function ChoirPage() {
                                 state: {
                                   backUrl: `/choir/${id}`,
                                   // Liste ordonnée des ids après filtres — permet le swipe dans SongPage
-                                  songList: getGroupedSongs(filteredSongs).flatMap((g) => g.songs.map((s) => s.id)),
+                                  songList: getGroupedSongs(
+                                    selectedHashtag
+                                      ? filteredSongs.filter((s) => s.hashtags?.includes(selectedHashtag))
+                                      : filteredSongs
+                                  ).flatMap((g) => g.songs.map((s) => s.id)),                                  
                                 }
                               })}
                               style={{ cursor: 'pointer' }}

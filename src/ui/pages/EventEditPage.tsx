@@ -298,6 +298,18 @@ export default function EventEditPage() {
                 </>
               )}
 
+              {/* Boutons dupliqués avant la liste des chants — pour éviter le scroll */}
+              <div style={{ marginBottom: '0.5rem' }}>
+                <button className="page-button" type="submit" disabled={loading}>
+                  {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
+                </button>
+              </div>
+              <div>
+                <button type="button" className="page-button2" onClick={() => navigate(backUrl)}>
+                  Annuler
+                </button>
+              </div>
+
               <p style={{ color: '#044C8D', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' }}>
                 Chants associés à cet événement :
               </p>

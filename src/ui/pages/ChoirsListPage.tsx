@@ -11,7 +11,6 @@ import { usePageLoader } from '../hooks/usePageLoader';
 
 export default function MyChoirsPage() {
   const [user, setUser] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   // Chorales rejointes ou possédées explicitement
   const [choirs, setChoirs] = useState<any[]>([]);
   // Chorales fantômes : chorales de rattachement d'événements rejoints directement,
@@ -112,7 +111,6 @@ export default function MyChoirsPage() {
         setUser(currentUser);
         const admin = await isCurrentUserAdmin();
         if (cancelled.current) return;
-        setIsAdmin(admin);        
         try {
           // Récupérer le quota de chorales autorisées pour cet utilisateur
           const param = await getUserParam(currentUser.email!);
@@ -127,7 +125,7 @@ export default function MyChoirsPage() {
           // Déterminer si l'utilisateur peut encore créer une chorale
           // (nombre de chorales possédées < quota autorisé) ou (admin)
           if (param) {
-            setCanCreate(isAdmin || choirData.length < param.choirs_nb);
+            setCanCreate(admin || choirData.length < param.choirs_nb);
           }
 
           // Synchroniser les chorales propriétaires dans le localStorage :

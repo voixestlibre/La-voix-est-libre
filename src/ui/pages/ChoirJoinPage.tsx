@@ -108,9 +108,6 @@ export default function ChoirJoinPage() {
         // Si timeout déclenché
         if (cancelled.current) return;
 
-        // Si aucune chorale trouvée → passer au test code événement
-        if (!data) throw new Error('not a choir');
-
         // Ajouter la chorale dans joined_choirs si pas déjà présente
         const storedChoirs = getStoredChoirs();
         if (!storedChoirs.find((c) => String(c.code) === String(data.code))) {
@@ -141,7 +138,7 @@ export default function ChoirJoinPage() {
         if (!cancelled.current) navigate(`/choir/${data.id}`);
         return;
       } catch (err: any) {
-        if (err?.message === 'not a choir') {
+        if (err?.status === 404) {
           // Pas une chorale, on essaie événement — ne pas afficher de bannière
         } else {
           // Erreur réseau réelle

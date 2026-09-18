@@ -28,9 +28,11 @@ async function request<T>(
   const json: ApiResponse<T> = await res.json();
 
   if (!json.success) {
-    throw new Error(json.error ?? 'Erreur API');
+    const error = new Error(json.error ?? 'Erreur API') as any;
+    error.status = res.status;
+    throw error;
   }
-
+  
   return json.data as T;
 }
 
