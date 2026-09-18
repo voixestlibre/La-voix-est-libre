@@ -67,3 +67,15 @@ export async function getChoirDelegates(choirId: string): Promise<string[]> {
 export async function revokeDelegation(email: string, choirId: string): Promise<void> {
   await apiPost('users.php?action=revoke_delegation', { email, choir_id: choirId });
 }
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiPost('auth.php?action=request_reset', { email });
+}
+
+export async function verifyResetToken(token: string): Promise<{ email: string }> {
+  return apiGet<{ email: string }>(`auth.php?action=verify_reset_token&token=${token}`);
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await apiPost('auth.php?action=reset_password', { token, password });
+}

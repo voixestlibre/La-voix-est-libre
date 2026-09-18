@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from '../../infrastructure/storage/authService';
 import { getChoirOwner } from '../../infrastructure/storage/choirsService';
-import { createSong, uploadSongFile, fileExists, updateSong, getSongByTitle } from '../../infrastructure/storage/songsService';
+import { createSong, uploadSongFile, fileExists, updateSong, 
+  getSongByTitle, EXTERNAL_SONG_BASE_URL } from '../../infrastructure/storage/songsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -123,6 +124,20 @@ export default function ImportSongPage() {
           .replace(/[,;]/g, '')
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const finalName = `${cleanName}.${ext}`;
+
+        // Si le chant a un code et que la chorale autorise les fichiers
+        // externes, vérifier si un fichier externe existe déjà pour cette extension
+        // (même nom logique affiché → doublon à éviter)
+        if (songCode) {
+          const externalUrl = `${EXTERNAL_SONG_BASE_URL}${songCode}/${songCode}.${ext}`;
+          try {
+            const headRes = await fetch(externalUrl, { method: 'HEAD' });
+            if (headRes.ok) {
+              report.skippedFiles.push(`${finalName} (fichier externe ${songCode}.${ext} déjà présent)`);
+              continue;
+            }
+          } catch {}
+        }        
   
         const alreadyExists = await fileExists(song.id, finalName);
         if (alreadyExists) {
