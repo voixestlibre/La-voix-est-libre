@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isCurrentUserAdmin, createUserAccount, listUsers, 
-  toggleAdmin, apiUpdateChoirsNb, updateUserLogin, deleteUser } from '../../infrastructure/storage/authService';
+  toggleAdmin, apiUpdateChoirsNb, updateUserLogin, deleteUser, notifyUser } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -149,6 +149,24 @@ export default function UserCreatePage() {
                       >
                         {u.is_admin ? 'Admin ✓' : 'Admin'}
                       </button>
+
+                      {/* Envoyer notification */}
+                      <i
+                        className="fa fa-envelope"
+                        title="Envoyer une notification par email"
+                        style={{ color: '#044C8D', cursor: 'pointer', fontSize: '1rem' }}
+                        onClick={async () => {
+                          if (!window.confirm(
+                            `Envoyer une notification par email à ${u.email} ?`
+                          )) return;
+                          try {
+                            await notifyUser(u.id);
+                            alert(`Notification envoyée à ${u.email}`);
+                          } catch (err: any) {
+                            alert(err.message || 'Erreur lors de l\'envoi');
+                          }
+                        }}
+                      />                      
 
                       {/* Supprimer — désactivé pour soi-même */}
                       {Number(u.id) !== Number(currentUserId) && (

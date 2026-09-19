@@ -99,3 +99,7 @@ export async function updateUserLogin(userId: number, login: string): Promise<vo
 export async function deleteUser(userId: number): Promise<void> {
   await apiDelete(`users.php?action=delete&id=${userId}`);
 }
+
+export async function notifyUser(userId: number): Promise<void> {
+  await apiPost(`users.php?action=notify&id=${userId}`);
+}

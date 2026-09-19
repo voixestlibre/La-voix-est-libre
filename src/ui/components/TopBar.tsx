@@ -147,11 +147,11 @@ export default function TopBar({ backUrl, helpPage, helpProfiles,
   };
 
   const menuItems = [
-    { label: 'Accueil',               icon: 'fa-house',         path: '/',             always: true  },
-    { label: 'Mes chorales',          icon: 'fa-people-group',  path: '/my-choirs',    always: false },
-    { label: 'Mes évènements',        icon: 'fa-calendar-days', path: '/my-events',    always: false },
-    { label: 'Rejoindre une chorale', icon: 'fa-circle-plus',   path: '/join-choir',   always: true  },
-    { label: 'Créer un utilisateur',  icon: 'fa-user-plus',     path: '/create-user',  always: false, adminOnly: true },
+    { label: 'Accueil',                 icon: 'fa-house',         path: '/',             always: true  },
+    { label: 'Mes chorales',            icon: 'fa-people-group',  path: '/my-choirs',    always: false },
+    { label: 'Mes évènements',          icon: 'fa-calendar-days', path: '/my-events',    always: false },
+    { label: 'Rejoindre une chorale',   icon: 'fa-circle-plus',   path: '/join-choir',   always: true  },
+    { label: 'Gérer les utilisateurs',  icon: 'fa-user-plus',     path: '/create-user',  always: false, adminOnly: true },
   ].filter(item => (item.always || hasChoirs) && (!item.adminOnly || isAdmin));
 
   // Afficher le bouton aide uniquement si helpPage est défini et présent dans helpContent
