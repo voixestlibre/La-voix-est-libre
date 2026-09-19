@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isCurrentUserAdmin, createUserAccount, listUsers, 
-  toggleAdmin, apiUpdateChoirsNb } from '../../infrastructure/storage/authService';
+  toggleAdmin, apiUpdateChoirsNb, updateUserLogin } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -149,6 +149,35 @@ export default function UserCreatePage() {
                       {u.is_admin ? 'Admin ✓' : 'Admin'}
                     </button>
                   </div>
+
+{/* Login éditable */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
+  <i className="fa fa-at" style={{ color: '#044C8D', width: '1rem' }}></i>
+  <input
+    type="text"
+    placeholder="Login (optionnel)"
+    defaultValue={u.login ?? ''}
+    onBlur={async (e) => {
+      const newLogin = e.target.value.trim();
+      if (newLogin === (u.login ?? '')) return; // pas de changement
+      try {
+        await updateUserLogin(u.id, newLogin);
+        setUsers((prev) => prev.map((x) =>
+          x.id === u.id ? { ...x, login: newLogin || null } : x
+        ));
+      } catch (err: any) {
+        alert(err.message || 'Erreur lors de la mise à jour du login');
+        e.target.value = u.login ?? '';
+      }
+    }}
+    style={{
+      border: '1px solid #ccc', borderRadius: '6px',
+      padding: '0.2rem 0.4rem', fontSize: '0.82rem',
+      width: '140px',
+    }}
+  />
+</div>
+
                   {u.owned_choirs && (
                     <span style={{ fontSize: '0.82rem', color: '#555' }}>
                       <i className="fa fa-music" style={{ marginRight: '0.4rem', color: '#DA486D' }}></i>

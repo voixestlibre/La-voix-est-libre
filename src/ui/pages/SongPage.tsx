@@ -387,6 +387,20 @@ export default function SongPage() {
     }
   }, [audioUrl]);
 
+  // Bloquer/restaurer le scroll de la page selon l'état de la visionneuse PDF
+  useEffect(() => {
+    if (pdfPages.length > 0) {
+      // PDF ouvert : bloquer le scroll de la page derrière
+      document.body.style.overflow = 'hidden';
+    } else {
+      // PDF fermé ou en cours de chargement : laisser le scroll normal
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [pdfPages]);
+
   // ── Vibration mobile ──────────────────────────────────────────────────
   const vibrateIfMobile = () => {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {

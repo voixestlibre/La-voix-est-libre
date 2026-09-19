@@ -111,7 +111,7 @@ export default function LoginPage() {
               {/* Formulaire de connexion */}
               <h2>Connexion</h2>
               <form onSubmit={handleSubmit}>
-                <input type="email" placeholder="Email" value={email}
+                <input type="text" placeholder="Email ou login" autoComplete="username" value={email}
                   onChange={(e) => setEmail(e.target.value)} required className="page-form-input" />
                 <div style={{ position: 'relative' }}>
                   <input

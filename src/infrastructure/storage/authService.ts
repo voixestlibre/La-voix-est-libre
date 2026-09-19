@@ -91,3 +91,7 @@ export async function toggleAdmin(userId: number, value: boolean): Promise<void>
 export async function apiUpdateChoirsNb(userId: number, value: number): Promise<void> {
   await apiPost(`users.php?action=update_choirs_nb&id=${userId}&value=${value}`);
 }
+
+export async function updateUserLogin(userId: number, login: string): Promise<void> {
+  await apiPost(`users.php?action=update_login&id=${userId}`, { login });
+}
