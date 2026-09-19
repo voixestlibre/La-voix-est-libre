@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isCurrentUserAdmin, createUserAccount, listUsers, 
-  toggleAdmin, apiUpdateChoirsNb, updateUserLogin } from '../../infrastructure/storage/authService';
+  toggleAdmin, apiUpdateChoirsNb, updateUserLogin, deleteUser } from '../../infrastructure/storage/authService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -132,22 +132,44 @@ export default function UserCreatePage() {
                       <i className="fa fa-user" style={{ color: '#044C8D', marginRight: '0.5rem' }}></i>
                       {u.email}
                     </span>
-                    {/* Toggle admin — désactivé pour l'utilisateur connecté */}
-                    <button
-                      type="button"
-                      className={u.is_admin ? 'page-button' : 'page-button2'}
-                      style={{ padding: '0.2rem 0.6rem', fontSize: '0.8rem',
-                        opacity: Number(u.id) === Number(currentUserId) ? 0.4 : 1 }}
-                      disabled={Number(u.id) === Number(currentUserId)}
-                      onClick={async () => {
-                        await toggleAdmin(u.id, !u.is_admin);
-                        setUsers((prev) => prev.map((x) =>
-                          x.id === u.id ? { ...x, is_admin: !u.is_admin } : x
-                        ));
-                      }}
-                    >
-                      {u.is_admin ? 'Admin ✓' : 'Admin'}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {/* Toggle admin */}
+                      <button
+                        type="button"
+                        className={u.is_admin ? 'page-button' : 'page-button2'}
+                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.8rem',
+                          opacity: Number(u.id) === Number(currentUserId) ? 0.4 : 1 }}
+                        disabled={Number(u.id) === Number(currentUserId)}
+                        onClick={async () => {
+                          await toggleAdmin(u.id, !u.is_admin);
+                          setUsers((prev) => prev.map((x) =>
+                            x.id === u.id ? { ...x, is_admin: !u.is_admin } : x
+                          ));
+                        }}
+                      >
+                        {u.is_admin ? 'Admin ✓' : 'Admin'}
+                      </button>
+
+                      {/* Supprimer — désactivé pour soi-même */}
+                      {Number(u.id) !== Number(currentUserId) && (
+                        <i
+                          className="fa fa-trash trash"
+                          title="Supprimer cet utilisateur"
+                          style={{ color: '#DA486D', cursor: 'pointer' }}
+                          onClick={async () => {
+                            if (!window.confirm(
+                              `Supprimer l'utilisateur ${u.email} ?\n\nCette action est irréversible.`
+                            )) return;
+                            try {
+                              await deleteUser(u.id);
+                              setUsers((prev) => prev.filter((x) => x.id !== u.id));
+                            } catch (err: any) {
+                              alert(err.message || 'Erreur lors de la suppression');
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
 
 {/* Login éditable */}

@@ -86,7 +86,8 @@ export async function getSongFiles(
   // Source 2 : fichiers proposés sur larminat.fr (si code défini)
   if (songCode && songTitle) {
     const toCheck = [
-      { name: `${songTitle}.pdf`, urlSuffix: `${songCode}.pdf` },
+      // { name: `${songTitle}.pdf`, urlSuffix: `${songCode}.pdf` },
+      { name: 'Partition.pdf', urlSuffix: `${songCode}.pdf` },      
       { name: `${songTitle}.mp3`, urlSuffix: `${songCode}.mp3` },
       { name: `${songTitle} - Instruments.mp3`, urlSuffix: `${songCode}-2.mp3` },
       { name: `${songTitle} - Alto.mp3`, urlSuffix: `${songCode}-A.mp3` },

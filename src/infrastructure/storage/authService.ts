@@ -1,5 +1,5 @@
 // src/infrastructure/storage/authService.ts
-import { apiGet, apiPost } from './apiClient';
+import { apiGet, apiPost, apiDelete } from './apiClient';
 
 export interface CurrentUser {
   id: number;
@@ -94,4 +94,8 @@ export async function apiUpdateChoirsNb(userId: number, value: number): Promise<
 
 export async function updateUserLogin(userId: number, login: string): Promise<void> {
   await apiPost(`users.php?action=update_login&id=${userId}`, { login });
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  await apiDelete(`users.php?action=delete&id=${userId}`);
 }
