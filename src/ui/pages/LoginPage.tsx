@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   // Gestion du spinner et des bandeaux réseau
   const { loading, setLoading, showTimeoutBanner, showOfflineBanner,
@@ -95,24 +96,48 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-
+  
     try {
-      const result = await login(email, password);
-      setMessage(result.message);
-      // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
-      setUser({
-        email: result.email!,
-        login: result.login ?? null,
-        isAdmin: result.isAdmin,
-        choirs_nb: 0,
-        choirs_delegations: null,
-      });
-      navigate('/');
+      await login(email, password);
+    
+      // Récupérer le profil complet depuis la session PHP
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        setUser({
+          email: currentUser.email,
+          login: currentUser.login ?? null,
+          isAdmin: currentUser.is_admin,
+          choirs_nb: currentUser.choirs_nb,
+          choirs_delegations: currentUser.choirs_delegations,
+        });
+    
+        // Charger les chorales propriétaires
+        try {
+          const owned = await getOwnedChoirs(currentUser.id);
+          setOwnedChoirs(owned);
+        } catch {}
+    
+        // Charger les chorales déléguées
+        try {
+          if (currentUser.choirs_delegations) {
+            const ids = currentUser.choirs_delegations.split(',').filter(Boolean);
+            if (ids.length > 0) {
+              const choirs = await getChoirsByIds(ids);
+              setDelegatedChoirs(choirs);
+            }
+          }
+        } catch {}
+      }
+    
+      setJustLoggedIn(true);
+      setTimeout(() => navigate('/'), 4000);
+    
     } catch (err: any) {
       setMessage(err.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
+
   };
 
   // La déconnexion via signOut() invalide la session côté client.
@@ -133,7 +158,7 @@ export default function LoginPage() {
           {user ? (
             <>
               {/* Utilisateur connecté : afficher son email, son profil et le bouton de déconnexion */}
-              <h2>Déconnexion</h2>
+              <h2>{justLoggedIn ? 'Connexion réussie !' : 'Déconnexion'}</h2>
               <p style={{ margin: '0.2rem 0' }}>
                 <strong>Utilisateur connecté :</strong> {user.email}
               </p>
@@ -208,13 +233,22 @@ export default function LoginPage() {
 
               </div>
 
-              <button type="button" className="page-button"
-                disabled={showOfflineBanner || showTimeoutBanner}
-                style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
-                onClick={handleLogout}
-              >
-                Se déconnecter
-              </button>
+              {justLoggedIn && (
+                <p style={{ color: '#044C8D', fontSize: '0.9rem', margin: '0.5rem 0' }}>
+                  Redirection vers l'accueil dans quelques secondes...
+                </p>
+              )}              
+
+              {/* Bouton Se déconnecter — masqué si on vient de se connecter */}
+              {!justLoggedIn && (
+                <button type="button" className="page-button"
+                  disabled={showOfflineBanner || showTimeoutBanner}
+                  style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
+                  onClick={handleLogout}
+                >
+                  Se déconnecter
+                </button>
+              )}
             </>
           ) : (
             <>
