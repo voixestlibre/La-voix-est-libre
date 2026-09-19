@@ -46,3 +46,7 @@ export async function countOwnedChoirs(userId: string | number): Promise<number>
 export async function toggleExternalFiles(choirId: string, value: boolean) {
   return apiPost(`choirs.php?action=toggle_external_files&id=${choirId}&value=${value}`);
 }
+
+export async function getChoirsByIds(ids: string[]) {
+  return apiGet<any[]>(`choirs.php?action=by_ids&ids=${encodeURIComponent(ids.join(','))}`);
+}

@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiDelete } from './apiClient';
 export interface CurrentUser {
   id: number;
   email: string;
+  login?: string | null;
   is_admin: boolean;
   choirs_nb: number;
   choirs_delegations: string | null;

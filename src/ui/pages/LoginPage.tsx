@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, login, signOut } from '../../infrastructure/storage/authService';
+import { getOwnedChoirs, getChoirsByIds } from '../../infrastructure/storage/choirsService';
 import '../../App.css';
 import TopBar from '../components/TopBar';
 import { type UserProfile } from '../components/helpData';
@@ -10,7 +11,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const [user, setUser] = useState<{ email: string; isAdmin: boolean } | null>(null);
+  const [user, setUser] = useState<{
+    email: string;
+    login: string | null;
+    isAdmin: boolean;
+    choirs_nb: number;
+    choirs_delegations: string | null;
+  } | null>(null);
+  const [ownedChoirs, setOwnedChoirs] = useState<{ id: number; name: string; code: string }[]>([]);
+  const [delegatedChoirs, setDelegatedChoirs] = useState<{ id: number; name: string; code: string }[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const [helpProfiles] = useState<UserProfile[]>(['anonymous']);
@@ -47,7 +56,30 @@ export default function LoginPage() {
       if (cancelled.current) return;
 
       if (currentUser) {
-        setUser({ email: currentUser.email!, isAdmin: false });
+        setUser({
+          email: currentUser.email,
+          login: currentUser.login ?? null,
+          isAdmin: currentUser.is_admin,
+          choirs_nb: currentUser.choirs_nb,
+          choirs_delegations: currentUser.choirs_delegations,
+        });
+      
+        // Charger les chorales propriétaires
+        try {
+          const owned = await getOwnedChoirs(currentUser.id);
+          if (!cancelled.current) setOwnedChoirs(owned);
+        } catch {}
+      
+        // Charger les chorales déléguées
+        try {
+          if (currentUser.choirs_delegations) {
+            const ids = currentUser.choirs_delegations.split(',').filter(Boolean);
+            if (ids.length > 0) {
+              const choirs = await getChoirsByIds(ids);
+              if (!cancelled.current) setDelegatedChoirs(choirs);
+            }
+          }
+        } catch {}
       }
 
       // Si timeout déclenché
@@ -68,7 +100,13 @@ export default function LoginPage() {
       const result = await login(email, password);
       setMessage(result.message);
       // Utilisateur existant → mettre à jour l'état et rediriger vers l'accueil
-      setUser({ email: result.email!, isAdmin: result.isAdmin });
+      setUser({
+        email: result.email!,
+        login: result.login ?? null,
+        isAdmin: result.isAdmin,
+        choirs_nb: 0,
+        choirs_delegations: null,
+      });
       navigate('/');
     } catch (err: any) {
       setMessage(err.message || 'Une erreur est survenue');
@@ -94,11 +132,83 @@ export default function LoginPage() {
         <>
           {user ? (
             <>
-              {/* Utilisateur connecté : afficher son email et le bouton de déconnexion */}
+              {/* Utilisateur connecté : afficher son email, son profil et le bouton de déconnexion */}
               <h2>Déconnexion</h2>
-              <p>Utilisateur connecté : {user.email}</p>
-              {/* Bouton désactivé si offline ou timeOut */}
-              <button type="button" className="page-button" 
+              <p style={{ margin: '0.2rem 0' }}>
+                <strong>Utilisateur connecté :</strong> {user.email}
+              </p>
+              {user.login && (
+                <p style={{ margin: '0.2rem 0' }}>
+                  <strong>Login :</strong> {user.login}
+                </p>
+              )}
+
+              <div style={{ margin: '1rem 0', borderTop: '1px solid #E6F2FF', paddingTop: '1rem' }}>
+
+                {/* Admin */}
+                {user.isAdmin && (
+                  <p style={{ margin: '0.3rem 0', color: '#044C8D' }}>
+                    <i className="fa fa-shield-halved" style={{ marginRight: '0.5rem' }}></i>
+                    Droits d'administration
+                  </p>
+                )}
+
+                {/* Chorales propriétaires */}
+                {ownedChoirs.length > 0 && (
+                  <div style={{ margin: '0.5rem 0' }}>
+                    <p style={{ margin: '0.2rem 0', fontWeight: 'bold' }}>
+                      <i className="fa fa-music" style={{ color: '#DA486D', marginRight: '0.5rem' }}></i>
+                      Chorale{ownedChoirs.length > 1 ? 's' : ''} créée{ownedChoirs.length > 1 ? 's' : ''} :
+                    </p>
+                    {ownedChoirs.map((c) => (
+                      <p key={c.id} style={{ margin: '0.1rem 0 0.1rem 1.5rem', fontSize: '0.9rem' }}>
+                        • {c.name}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quota restant — non-admins uniquement */}
+                {!user.isAdmin && (() => {
+                  const nbRestant = user.choirs_nb - ownedChoirs.length;
+                  if (user.choirs_nb === 0) return (
+                    <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', color: '#888' }}>
+                      <i className="fa fa-circle-xmark" style={{ marginRight: '0.5rem' }}></i>
+                      Aucun droit de créer une chorale
+                    </p>
+                  );
+                  if (nbRestant <= 0) return (
+                    <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', color: '#888' }}>
+                      <i className="fa fa-circle-xmark" style={{ marginRight: '0.5rem' }}></i>
+                      Quota de chorales atteint
+                    </p>
+                  );
+                  return (
+                    <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', color: '#044C8D' }}>
+                      <i className="fa fa-circle-plus" style={{ marginRight: '0.5rem' }}></i>
+                      Peut encore créer {nbRestant} chorale{nbRestant > 1 ? 's' : ''}
+                    </p>
+                  );
+                })()}
+
+                {/* Chorales déléguées */}
+                {delegatedChoirs.length > 0 && (
+                  <div style={{ margin: '0.5rem 0' }}>
+                    <p style={{ margin: '0.2rem 0', fontWeight: 'bold' }}>
+                      <i className="fa fa-handshake" style={{ color: '#044C8D', marginRight: '0.5rem' }}></i>
+                      Délégation{delegatedChoirs.length > 1 ? 's' : ''} :
+                    </p>
+                    {delegatedChoirs.map((c) => (
+                      <p key={c.id} style={{ margin: '0.1rem 0 0.1rem 1.5rem', fontSize: '0.9rem' }}>
+                        • {c.name}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+
+              <button type="button" className="page-button"
                 disabled={showOfflineBanner || showTimeoutBanner}
                 style={{ opacity: showOfflineBanner || showTimeoutBanner ? 0.5 : 1 }}
                 onClick={handleLogout}
