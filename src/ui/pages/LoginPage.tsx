@@ -158,7 +158,7 @@ export default function LoginPage() {
           {user ? (
             <>
               {/* Utilisateur connecté : afficher son email, son profil et le bouton de déconnexion */}
-              <h2>{justLoggedIn ? 'Connexion réussie !' : 'Déconnexion'}</h2>
+              <h2>{justLoggedIn ? 'Connexion réussie' : 'Déconnexion'}</h2>
               <p style={{ margin: '0.2rem 0' }}>
                 <strong>Utilisateur connecté :</strong> {user.email}
               </p>
