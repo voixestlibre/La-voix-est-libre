@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUserParam, getUserDelegations, 
-  getUserParamId, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserDelegations, getUserParamId, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles, toggleEventActive } from '../../infrastructure/storage/eventsService';
 import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
 import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
