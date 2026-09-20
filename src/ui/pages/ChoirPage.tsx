@@ -369,7 +369,9 @@ export default function ChoirPage() {
                 <p>Aucun événement pour cette chorale.</p>
               ) : (
                 <ul className="list-music">
-                  {events.map((ev) => (
+                  {events
+                    .filter((ev) => (ev.active ?? true) || isOwner || isDelegate || isAdmin)
+                    .map((ev) => (                  
                     <div key={ev.id} className="card-music pink">
                       {/* Icône calendrier : rose si actif, grise si inactif
                           Cliquable uniquement par le propriétaire ou le délégué créateur */}

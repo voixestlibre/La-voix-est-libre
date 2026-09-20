@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCurrentUser, getUserParamId } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParamId, getUserDelegations, 
+  isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getChoirOwner, getChoir } from '../../infrastructure/storage/choirsService';
 import { getEvent, getEventSongsDetails, incrementEventViews } from '../../infrastructure/storage/eventsService';
 import { getCachedEvent, getStoredChoirs, getStoredEvents } from '../../infrastructure/storage/localStorageService';
@@ -307,6 +308,15 @@ export default function EventPage() {
         const userParamId = currentUser ? await getUserParamId(currentUser.email!) : null;
         const creatorCheck = userParamId !== null && eventData.created_by === userParamId;
 
+        // Vérifier si délégué de la chorale
+        const delegations = currentUser
+          ? await getUserDelegations(currentUser.email!)
+          : [];
+        const isDelegateCheck = delegations.includes(String(eventData.choir_id));
+
+        // Vérifier si admin
+        const adminCheck = currentUser ? await isCurrentUserAdmin() : false;
+
         // Si timeout déclenché
         if (cancelled.current) return;        
 
@@ -323,7 +333,8 @@ export default function EventPage() {
         }
 
         // Bloquer l'accès si l'événement est inactif pour les non-admins
-        if (eventData.active === false && !ownerCheck && !creatorCheck) {
+        if (eventData.active === false && !ownerCheck && !creatorCheck 
+          && !isDelegateCheck && !adminCheck) {
           navigate(`/choir/${eventData.choir_id}`, { replace: true });
           return;
         }

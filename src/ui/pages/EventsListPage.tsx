@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUserDelegations, getUserParamId } from '../../infrastructure/storage/authService';
+import { getCurrentUser, getUserParam, getUserDelegations, 
+  getUserParamId, isCurrentUserAdmin } from '../../infrastructure/storage/authService';
 import { getEventsByChoirIds, getEventsByCodes, getEventSongsTitles, toggleEventActive } from '../../infrastructure/storage/eventsService';
 import { getOwnedChoirs } from '../../infrastructure/storage/choirsService';
 import { getStoredChoirs, getStoredEvents, setStoredEvents, getCachedEvent, setCachedEventId, clearCachedEventId } from '../../infrastructure/storage/localStorageService';
@@ -22,6 +23,7 @@ type ConfirmBanner = {
 };
 
 export default function MyEventsPage() {
+  const [isAdmin, setIsAdmin] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [ownedChoirIds, setOwnedChoirIds] = useState<string[]>([]);
   const [collecting, setCollecting] = useState(false);
@@ -63,6 +65,9 @@ export default function MyEventsPage() {
 
     const fetchData = async () => {
       const currentUser = await getCurrentUser();
+      const admin = await isCurrentUserAdmin();
+      if (cancelled.current) return;
+      setIsAdmin(admin);      
 
       // Si timeout déclenché
       if (cancelled.current) return;
@@ -485,7 +490,14 @@ export default function MyEventsPage() {
         <p>Vous n'avez aucun événement.</p>
       ) : (
         <ul className="list-music">
-          {events.map((e) => {
+          {events
+            .filter((e) => {
+              if (e.active ?? true) return true;
+              const isOwner = ownedChoirIds.includes(String(e.choir_id));
+              const isDelegate = delegatedChoirIds.includes(String(e.choir_id));
+              return isOwner || isDelegate || isAdmin;
+            })
+            .map((e) => {          
             const isCached = getStoredEvents().find(
               (se) => String(se.id) === String(e.id)
             )?.is_cached ?? false;
