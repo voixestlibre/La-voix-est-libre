@@ -234,10 +234,10 @@ export default function LoginPage() {
               </div>
 
               {justLoggedIn && (
-                <p style={{ color: '#044C8D', fontSize: '0.9rem', margin: '0.5rem 0' }}>
+                <p style={{ color: '#044C8D', fontSize: '0.9rem', margin: '2.9rem 0 0.5rem 0' }}>
                   Redirection vers l'accueil dans quelques secondes...
                 </p>
-              )}              
+              )} 
 
               {/* Bouton Se déconnecter — masqué si on vient de se connecter */}
               {!justLoggedIn && (
