@@ -698,19 +698,14 @@ export default function SongPage() {
     let url: string;
     if (isOffline) {
       const cachedEvent = getCachedEvent();
-      // Trouver le fichier en cache correspondant à ce nom affiché
-      // En mode offline, files = [{ name: displayName }] sans url
-      // cached_files = [{ songId, fileName: physicalName, url }]
-      // On cherche par songId + extension + position dans la liste
       const songFiles = cachedEvent?.cached_files?.filter(
         (f) => String(f.songId) === String(songId)
       ) ?? [];
-  
-      // Trouver l'index de ce fichier dans files (liste affichée)
       const fileIndex = files.findIndex((f) => f.name === fileName);
       const cachedFile = fileIndex >= 0 ? songFiles[fileIndex] : undefined;
+      const physicalFileName = cachedFile?.fileName ?? fileName;
   
-      const publicUrl = cachedFile?.url ?? getSongFileUrl(songId!, cachedFile?.fileName ?? fileName);
+      const publicUrl = cachedFile?.url ?? getSongFileUrl(songId!, physicalFileName);
       url = (await getCachedFileUrl(String(cachedEvent!.id), publicUrl)) ?? publicUrl;
     } else {
       url = getPublicUrl(fileName);
