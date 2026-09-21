@@ -130,7 +130,7 @@ export default function LoginPage() {
       }
     
       setJustLoggedIn(true);
-      setTimeout(() => navigate('/'), 4000);
+      setTimeout(() => navigate('/'), 2500);
     
     } catch (err: any) {
       setMessage(err.message || 'Une erreur est survenue');
